@@ -1,15 +1,17 @@
-﻿# Python
+﻿# Secret Environment Configuration
+.env
+.env.local
+*.env
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.Python
 env/
 venv/
 .venv/
 
-# Environment / OS
+# System
 .DS_Store
 Thumbs.db
-.vscode/
-.idea/

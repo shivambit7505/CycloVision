@@ -1,16 +1,26 @@
 ﻿import io
+import os
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from PIL import Image
 
+# Load environment variables from .env if present
+if os.path.exists(".env"):
+    with open(".env", "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip() and not line.startswith("#") and "=" in line:
+                k, v = line.strip().split("=", 1)
+                os.environ[k] = v
+
 from data_simulator import SatelliteDataSimulator
 from ai_engine import CycloVisionAIEngine
 from similarity_engine import CycloneSimilarityEngine
 from bulletin_generator import IMDBulletinDispatcher
+from external_service import ExternalIntelligenceService
 
-app = FastAPI(title="CycloVision AI API", version="2.0.0")
+app = FastAPI(title="CycloVision AI API", version="2.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +33,7 @@ app.add_middleware(
 simulator = SatelliteDataSimulator()
 ai_engine = CycloVisionAIEngine()
 sim_engine = CycloneSimilarityEngine()
+ext_service = ExternalIntelligenceService()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -61,6 +72,18 @@ def analyze_cyclone(req: CycloneAnalysisRequest):
             current_pressure=current_press,
             current_basin=req.basin
         )
+
+        # Generate Gemini / LLM Meteorological Insights
+        gemini_explanation = ext_service.generate_gemini_cyclone_explanation({
+            "basin": req.basin,
+            "dvorak_t_number": round(req.simulated_intensity, 1),
+            "estimated_wind_knots": round(current_wind, 1),
+            "central_pressure_hpa": round(current_press, 1),
+            "env": env,
+            "ri_probability": ri_data["ri_probability"]
+        })
+
+        mosdac_status = ext_service.verify_mosdac_feed_status()
         
         return {
             "storm_metadata": {
@@ -79,7 +102,10 @@ def analyze_cyclone(req: CycloneAnalysisRequest):
             "rapid_intensification": ri_data,
             "trajectory_forecast": traj_data["forecast_track"],
             "landfall_risk": traj_data["landfall_estimate"],
-            "top_historical_analogs": analogs
+            "top_historical_analogs": analogs,
+            "gemini_ai_reasoning": gemini_explanation,
+            "mosdac_integration": mosdac_status,
+            "mapbox_token": ext_service.mapbox_token
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -91,7 +117,6 @@ async def upload_satellite_image(file: UploadFile = File(...)):
         pil_img = Image.open(io.BytesIO(contents))
         detection_res = ai_engine.process_uploaded_image(pil_img)
         
-        # Run full pipeline with detected intensity
         detected_t = detection_res["estimated_t_number"]
         current_wind = float(detected_t * 17.5 + 10.0)
         stage_name, stage_code, alert_level = ai_engine.classify_imd_stage(current_wind)

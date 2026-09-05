@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        #map { height: 500px; width: 100%; border-radius: 0.5rem; }
+        #map { height: 490px; width: 100%; border-radius: 0.5rem; }
         .glass-panel { background: rgba(17, 24, 39, 0.92); backdrop-filter: blur(8px); }
     </style>
 </head>
@@ -26,6 +26,10 @@
             </div>
         </div>
         <div class="flex items-center space-x-3">
+            <div class="flex items-center gap-2 px-2.5 py-1 rounded bg-gray-900 border border-emerald-800 text-[11px] text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>MOSDAC / ISRO Link: Active</span>
+            </div>
             <span id="alertBadge" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-red-600/30 text-red-400 border border-red-500 animate-pulse">
                 RED ALERT
             </span>
@@ -39,13 +43,13 @@
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left Panel: Ingestion & Upload -->
         <div class="space-y-6">
-            <!-- Live Satellite Upload Card (Game-Changer Feature 1 & 2) -->
+            <!-- Live Satellite Upload Card -->
             <div class="glass-panel border border-cyan-800/60 p-5 rounded-xl shadow-lg bg-cyan-950/20">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="text-sm font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
                         <span>🛰️</span> Live Satellite Image Upload
                     </h2>
-                    <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-900 text-cyan-300">INSAT / GeoTIFF</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-900 text-cyan-300">INSAT-3D / GeoTIFF</span>
                 </div>
                 <div class="space-y-3 text-xs">
                     <p class="text-gray-400">Upload raw INSAT-3D/3DR TIR or satellite image for instant AI Center Fix & Objective Dvorak inference:</p>
@@ -112,7 +116,7 @@
                 </div>
             </div>
 
-            <!-- Rapid Intensification Card (Feature 3) -->
+            <!-- Rapid Intensification Card -->
             <div class="glass-panel border border-red-900/60 p-4 rounded-xl bg-red-950/20">
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-red-400 uppercase">⚡ Rapid Intensification (RI)</span>
@@ -124,17 +128,39 @@
             </div>
         </div>
 
-        <!-- Right 2 Columns: WebGIS, Landfall & District Vulnerability -->
+        <!-- Right 2 Columns: Map, Gemini AI Reasoning & Landfall -->
         <div class="lg:col-span-2 space-y-6">
+            <!-- Map Card with Layer Toggle -->
             <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
                 <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider">🗺️ Track & Quantile Uncertainty Cone (120h)</h2>
-                    <span class="text-xs text-cyan-400">AI Deep Learning Inference</span>
+                    <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
+                        <span>🗺️</span> Real-Time Trajectory & Satellite Layer
+                    </h2>
+                    <div class="flex items-center gap-2 text-xs">
+                        <label class="text-gray-400">Map Layer:</label>
+                        <select id="mapLayerSelect" onchange="switchMapLayer()" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-cyan-400">
+                            <option value="satellite">High-Res Satellite View</option>
+                            <option value="dark">Dark Meteorological Grid</option>
+                        </select>
+                    </div>
                 </div>
                 <div id="map"></div>
             </div>
 
-            <!-- District-Level Coastal Vulnerability & Storm Surge (Feature 4) -->
+            <!-- Gemini / LLM Meteorological Reasoning Panel -->
+            <div class="glass-panel border border-purple-900/60 p-5 rounded-xl shadow-lg bg-purple-950/15">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                        <span>🧠</span> Gemini AI Meteorological Synoptic Analysis
+                    </h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-purple-900/70 text-purple-300 border border-purple-700">AI Synoptic Reasoning</span>
+                </div>
+                <div id="geminiText" class="text-xs text-gray-300 space-y-2 whitespace-pre-line leading-relaxed">
+                    Loading Gemini AI synoptic analysis...
+                </div>
+            </div>
+
+            <!-- District-Level Coastal Vulnerability & Storm Surge -->
             <div class="glass-panel border border-yellow-800/50 p-5 rounded-xl bg-yellow-950/10">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="text-sm font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-2">
@@ -152,9 +178,7 @@
                                 <th class="p-2">Threat Level</th>
                             </tr>
                         </thead>
-                        <tbody id="districtTableBody" class="divide-y divide-gray-800">
-                            <!-- Populated dynamically -->
-                        </tbody>
+                        <tbody id="districtTableBody" class="divide-y divide-gray-800"></tbody>
                     </table>
                 </div>
                 <div class="mt-4 p-3 rounded bg-gray-900 border border-gray-800 flex justify-between items-center text-xs">
@@ -188,12 +212,26 @@
     </div>
 
     <script>
-        let map, trackPolyline, conePolygons = [], centerMarker;
+        let map, currentTileLayer, trackPolyline, conePolygons = [], centerMarker;
+
+        const tileLayers = {
+            satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            dark: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        };
 
         function initMap() {
             map = L.map('map').setView([17.0, 84.0], 6);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            currentTileLayer = L.tileLayer(tileLayers.satellite, {
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                maxZoom: 18
+            }).addTo(map);
+        }
+
+        function switchMapLayer() {
+            const selected = document.getElementById('mapLayerSelect').value;
+            map.removeLayer(currentTileLayer);
+            currentTileLayer = L.tileLayer(tileLayers[selected], {
+                attribution: selected === 'satellite' ? 'Esri World Imagery' : '&copy; CARTO',
                 maxZoom: 18
             }).addTo(map);
         }
@@ -276,6 +314,11 @@
             document.getElementById('riProb').innerText = `${Math.round(data.rapid_intensification.ri_probability * 100)}% Probability`;
             document.getElementById('riDesc').innerText = data.rapid_intensification.reasoning;
 
+            // Gemini Reasoning
+            if (data.gemini_ai_reasoning) {
+                document.getElementById('geminiText').innerText = data.gemini_ai_reasoning;
+            }
+
             // Districts Table
             const tbody = document.getElementById('districtTableBody');
             tbody.innerHTML = '';
@@ -300,10 +343,11 @@
             const lat = m.current_center.lat;
             const lon = m.current_center.lon;
             centerMarker = L.circleMarker([lat, lon], {
-                radius: 9,
+                radius: 10,
                 color: '#ef4444',
                 fillColor: '#dc2626',
-                fillOpacity: 0.9
+                fillOpacity: 0.95,
+                weight: 2
             }).addTo(map).bindPopup(`<b>${m.system_name}</b><br>Stage: ${m.imd_stage_code}<br>Wind: ${m.estimated_wind_knots} kts`).openPopup();
 
             const trackPoints = [[lat, lon]];
@@ -311,17 +355,17 @@
                 trackPoints.push([pt.latitude, pt.longitude]);
                 const circle = L.circle([pt.latitude, pt.longitude], {
                     radius: pt.uncertainty_cone_radius_km * 1000,
-                    color: '#06b6d4',
+                    color: '#22d3ee',
                     fillColor: '#0891b2',
-                    fillOpacity: 0.15,
-                    weight: 1
+                    fillOpacity: 0.2,
+                    weight: 1.5
                 }).addTo(map);
                 conePolygons.push(circle);
             });
 
             trackPolyline = L.polyline(trackPoints, {
-                color: '#22d3ee',
-                weight: 3,
+                color: '#38bdf8',
+                weight: 3.5,
                 dashArray: '6, 6'
             }).addTo(map);
 
