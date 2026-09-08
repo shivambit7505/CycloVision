@@ -28,7 +28,7 @@
         <div class="flex items-center space-x-3">
             <div class="flex items-center gap-2 px-2.5 py-1 rounded bg-gray-900 border border-emerald-800 text-[11px] text-emerald-400">
                 <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>MOSDAC / ISRO Link: Active</span>
+                <span>Authoritative 3-Layer Ingestion: Active</span>
             </div>
             <span id="alertBadge" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-red-600/30 text-red-400 border border-red-500 animate-pulse">
                 RED ALERT
@@ -43,16 +43,34 @@
     <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Left Panel: Ingestion & Upload -->
         <div class="space-y-6">
+            <!-- 3-Layer Authoritative Data Badges Card -->
+            <div class="glass-panel border border-cyan-800/60 p-4 rounded-xl shadow-lg bg-cyan-950/20">
+                <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <span>📡</span> Authoritative Datasets (SIH26070)
+                </h3>
+                <div class="space-y-1.5 text-[11px] text-gray-300">
+                    <div class="p-1.5 rounded bg-gray-900/80 border border-gray-800">
+                        <span class="font-bold text-cyan-400">Layer 1 (Reference):</span> NOAA IBTrACS v4r01 + IMD Best-Track
+                    </div>
+                    <div class="p-1.5 rounded bg-gray-900/80 border border-gray-800">
+                        <span class="font-bold text-emerald-400">Layer 2 (Satellite):</span> INSAT-3D/3DR/3DS + HURSAT + NASA TROPICS
+                    </div>
+                    <div class="p-1.5 rounded bg-gray-900/80 border border-gray-800">
+                        <span class="font-bold text-purple-400">Layer 3 (Environmental):</span> NOAA ERSSTv6 + NASA MERRA-2 Reanalysis
+                    </div>
+                </div>
+            </div>
+
             <!-- Live Satellite Upload Card -->
-            <div class="glass-panel border border-cyan-800/60 p-5 rounded-xl shadow-lg bg-cyan-950/20">
+            <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
                 <div class="flex justify-between items-center mb-3">
                     <h2 class="text-sm font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
-                        <span>🛰️</span> Live Satellite Image Upload
+                        <span>🛰️</span> Satellite Observation Upload
                     </h2>
-                    <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-900 text-cyan-300">INSAT-3D / GeoTIFF</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-900 text-cyan-300">INSAT / TROPICS</span>
                 </div>
                 <div class="space-y-3 text-xs">
-                    <p class="text-gray-400">Upload raw INSAT-3D/3DR TIR or satellite image for instant AI Center Fix & Objective Dvorak inference:</p>
+                    <p class="text-gray-400">Upload satellite imagery for real-time deep learning center fix & continuous Dvorak grading:</p>
                     <input type="file" id="imageInput" accept="image/*" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-cyan-700 file:text-white hover:file:bg-cyan-600 cursor-pointer">
                     <button onclick="uploadSatelliteImage()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded shadow transition">
                         ⚡ Detect Center & Predict Intensity
@@ -61,7 +79,7 @@
                 </div>
             </div>
 
-            <!-- Simulation / Tuning -->
+            <!-- Synoptic Ingestion Tuning -->
             <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
                 <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">⚙️ Synoptic Ingestion Tuning</h2>
                 <div class="space-y-4 text-xs">
