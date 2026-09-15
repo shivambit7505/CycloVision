@@ -1,194 +1,438 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CycloVision AI - MoES / IMD Operational Command Center</title>
+    <title>CycloVision AI — National Cyclone Decision Support Platform</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        #map { height: 490px; width: 100%; border-radius: 0.5rem; }
-        .glass-panel { background: rgba(17, 24, 39, 0.92); backdrop-filter: blur(8px); }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+        #map { height: 500px; width: 100%; border-radius: 0.75rem; }
+        .glass-card {
+            background: rgba(13, 20, 36, 0.85);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glow-cyan { box-shadow: 0 0 25px rgba(6, 182, 212, 0.25); }
+        .glow-emerald { box-shadow: 0 0 25px rgba(16, 185, 129, 0.2); }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col font-sans">
+<body class="bg-[#070b14] text-slate-100 min-h-screen flex flex-col selection:bg-cyan-500 selection:text-black font-sans">
     <!-- Header -->
-    <header class="border-b border-gray-800 bg-gray-900/90 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+    <header class="border-b border-cyan-950/80 bg-[#0a0f1d]/90 backdrop-blur-md px-6 py-3 flex flex-wrap items-center justify-between sticky top-0 z-50 gap-3">
         <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center font-bold text-cyan-400 text-lg">🌀</div>
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-teal-500 to-emerald-400 p-[1.5px] shadow-lg glow-cyan flex items-center justify-center">
+                <div class="w-full h-full bg-[#070b14] rounded-[10px] flex items-center justify-center text-xl">🌀</div>
+            </div>
             <div>
-                <h1 class="text-xl font-black tracking-wider uppercase text-white flex items-center gap-2">
-                    CycloVision <span class="text-cyan-400">AI</span>
-                    <span class="text-xs px-2 py-0.5 rounded bg-cyan-900/50 text-cyan-300 border border-cyan-700">SIH26070</span>
-                </h1>
-                <p class="text-xs text-gray-400">MoES / IMD Multi-Source Satellite & Disaster Decision-Support System</p>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-base font-black tracking-wide bg-gradient-to-r from-white via-cyan-200 to-teal-300 bg-clip-text text-transparent">
+                        CycloVision <span class="text-cyan-400 font-extrabold">AI</span>
+                    </h1>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-700/60 tracking-wider">SIH26070</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-400 border border-emerald-700/50 flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> Live Shield Active
+                    </span>
+                </div>
+                <p class="text-[11px] text-slate-400">MoES / IMD Multi-Spectral Satellite Early Warning & Life-Preservation Suite</p>
             </div>
         </div>
+
+        <!-- 4 Operational Modes Switcher (Feature 01, 15, 16, 25) -->
+        <div class="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+            <button onclick="setUIMode('command')" id="btnModeCommand" class="px-3 py-1.5 rounded-lg bg-cyan-600 text-white shadow transition">
+                🌐 Command Center
+            </button>
+            <button onclick="setUIMode('citizen')" id="btnModeCitizen" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+                <span>🛡️ Citizen Shield</span>
+            </button>
+            <button onclick="setUIMode('expert')" id="btnModeExpert" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+                <span>🏢 Expert / HITL</span>
+            </button>
+            <button onclick="setUIMode('emergency')" id="btnModeEmergency" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-amber-400 transition flex items-center gap-1.5">
+                <span>📶 2G Emergency</span>
+            </button>
+        </div>
+
+        <!-- Right Quick Actions -->
         <div class="flex items-center space-x-3">
-            <div class="flex items-center gap-2 px-2.5 py-1 rounded bg-gray-900 border border-emerald-800 text-[11px] text-emerald-400">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>Authoritative 3-Layer Ingestion: Active</span>
+            <!-- Language Voice Alert (Feature 24) -->
+            <div class="flex items-center bg-slate-900 border border-slate-700/70 rounded-lg px-2 py-1 gap-1.5">
+                <span class="text-xs">🗣️</span>
+                <select id="langSelect" class="bg-transparent text-xs text-cyan-300 focus:outline-none cursor-pointer">
+                    <option value="en" class="bg-slate-900">English</option>
+                    <option value="hi" class="bg-slate-900">हिन्दी (Hindi)</option>
+                    <option value="bn" class="bg-slate-900">বাংলা (Bengali)</option>
+                    <option value="te" class="bg-slate-900">తెలుగు (Telugu)</option>
+                    <option value="or" class="bg-slate-900">ଓଡ଼ିଆ (Odia)</option>
+                </select>
+                <button onclick="playVoiceAlert()" title="Speak Voice Alert" class="p-1 rounded bg-cyan-700/50 hover:bg-cyan-600 text-cyan-200 text-xs px-2 transition">
+                    🔊 Play
+                </button>
             </div>
+
             <span id="alertBadge" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-red-600/30 text-red-400 border border-red-500 animate-pulse">
                 RED ALERT
             </span>
-            <button onclick="downloadBulletin()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-4 py-2 rounded shadow transition">
-                📄 Export IMD Bulletin
+            <button onclick="downloadBulletin()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-3 py-1.5 rounded shadow transition">
+                📄 IMD Bulletin
             </button>
         </div>
     </header>
 
-    <!-- Main Grid -->
-    <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Left Panel: Ingestion & Upload -->
-        <div class="space-y-6">
-            <!-- 3-Layer Authoritative Data Badges Card -->
-            <div class="glass-panel border border-cyan-800/60 p-4 rounded-xl shadow-lg bg-cyan-950/20">
-                <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <span>📡</span> Authoritative Datasets (SIH26070)
-                </h3>
-                <div class="space-y-1.5 text-[11px] text-gray-300">
-                    <div class="p-1.5 rounded bg-gray-900/80 border border-gray-800">
-                        <span class="font-bold text-cyan-400">Layer 1 (Reference):</span> NOAA IBTrACS v4r01 + IMD Best-Track
-                    </div>
-                    <div class="p-1.5 rounded bg-gray-900/80 border border-gray-800">
-                        <span class="font-bold text-emerald-400">Layer 2 (Satellite):</span> INSAT-3D/3DR/3DS + HURSAT + NASA TROPICS
-                    </div>
-                    <div class="p-1.5 rounded bg-gray-900/80 border border-gray-800">
-                        <span class="font-bold text-purple-400">Layer 3 (Environmental):</span> NOAA ERSSTv6 + NASA MERRA-2 Reanalysis
-                    </div>
-                </div>
-            </div>
+    <!-- MAIN BODY CONTAINER -->
+    <main class="flex-1 p-6 space-y-6 max-w-[1700px] w-full mx-auto">
 
-            <!-- Live Satellite Upload Card -->
-            <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
-                <div class="flex justify-between items-center mb-3">
-                    <h2 class="text-sm font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
-                        <span>🛰️</span> Satellite Observation Upload
-                    </h2>
-                    <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-900 text-cyan-300">INSAT / TROPICS</span>
+        <!-- 1. LIVE CYCLONE COMMAND CENTER (Default Mode) -->
+        <div id="viewCommandCenter" class="space-y-6">
+            
+            <!-- Top Metric Banner (Feature 01, 04, 05, 08, 09, 20) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <!-- Current Storm Status -->
+                <div class="glass-card p-4 rounded-2xl relative overflow-hidden">
+                    <div class="flex justify-between items-center text-xs text-slate-400 mb-1">
+                        <span>Active System</span>
+                        <span class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-bold">LIVE • 14:00 UTC</span>
+                    </div>
+                    <div class="text-lg font-black text-white" id="statStormName">CYCLONE-X (BOB-02)</div>
+                    <div class="text-xs text-cyan-400 font-semibold mt-0.5" id="metricStage">Very Severe Cyclonic Storm (VSCS)</div>
+                    <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+                        <span>Center: <b class="text-slate-200 font-mono-code" id="statCoords">16.2°N, 84.6°E</b></span>
+                        <span class="text-emerald-400">AI Conf: 94%</span>
+                    </div>
                 </div>
-                <div class="space-y-3 text-xs">
-                    <p class="text-gray-400">Upload satellite imagery for real-time deep learning center fix & continuous Dvorak grading:</p>
-                    <input type="file" id="imageInput" accept="image/*" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-gray-300 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-cyan-700 file:text-white hover:file:bg-cyan-600 cursor-pointer">
-                    <button onclick="uploadSatelliteImage()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 rounded shadow transition">
-                        ⚡ Detect Center & Predict Intensity
-                    </button>
-                    <div id="uploadFeedback" class="hidden text-xs p-2.5 rounded bg-cyan-900/40 border border-cyan-700/60 text-cyan-200"></div>
-                </div>
-            </div>
 
-            <!-- Synoptic Ingestion Tuning -->
-            <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
-                <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">⚙️ Synoptic Ingestion Tuning</h2>
-                <div class="space-y-4 text-xs">
-                    <div>
-                        <label class="block text-gray-400 mb-1">Ocean Basin</label>
-                        <select id="basinSelect" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-gray-200">
-                            <option value="Bay of Bengal">Bay of Bengal (BoB)</option>
-                            <option value="Arabian Sea">Arabian Sea (AS)</option>
-                        </select>
+                <!-- Wind & Pressure Dynamics -->
+                <div class="glass-card p-4 rounded-2xl">
+                    <div class="text-xs text-slate-400 mb-1">Intensity & Dynamics</div>
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-2xl font-black text-cyan-400 font-mono-code" id="metricKmph">164.5 km/h</span>
+                        <span class="text-xs text-slate-400 font-mono-code" id="metricWind">(88.8 kts)</span>
                     </div>
-                    <div>
-                        <div class="flex justify-between mb-1">
-                            <label class="text-gray-400">Dvorak Intensity (T-Number)</label>
-                            <span id="tNoVal" class="text-cyan-400 font-bold">T4.5</span>
-                        </div>
-                        <input id="intensitySlider" type="range" min="1.5" max="7.5" step="0.5" value="4.5" class="w-full accent-cyan-400 cursor-pointer">
+                    <div class="text-xs text-slate-300 mt-1 flex justify-between">
+                        <span>Central: <b class="text-teal-300 font-mono-code" id="metricPress">968.6 hPa</b></span>
+                        <span class="text-rose-400 font-semibold" id="metricDeficit">Deficit: 41.4 hPa</span>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="text-[11px] text-slate-400 mt-1">Movement: <b>NW @ 14 km/h</b></div>
+                </div>
+
+                <!-- Rapid Intensification (Feature 09) -->
+                <div class="glass-card p-4 rounded-2xl border-rose-900/50 bg-gradient-to-br from-slate-900 via-rose-950/20 to-slate-900">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-rose-400 font-bold uppercase flex items-center gap-1">⚡ Rapid Intensification</span>
+                        <span class="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-extrabold" id="riProb">82% High Risk</span>
+                    </div>
+                    <div class="text-xs text-slate-200 mt-2 font-medium">SST 30.2°C & VWS 7.5 kts</div>
+                    <p class="text-[11px] text-slate-400 mt-1 leading-snug" id="riDesc">
+                        Warm Ocean Heat Content (95 kJ/cm²) & low shear confirm high explosive strengthening potential.
+                    </p>
+                </div>
+
+                <!-- Cyclogenesis Watch (Feature 08) -->
+                <div class="glass-card p-4 rounded-2xl">
+                    <div class="text-xs text-slate-400 mb-2 font-bold uppercase flex items-center gap-1.5">
+                        <span>🔮</span> Basin Formation Watch
+                    </div>
+                    <div class="space-y-1.5 text-[11px]">
                         <div>
-                            <label class="block text-gray-400 mb-1">Center Lat (°N)</label>
-                            <input id="latInput" type="number" step="0.1" value="16.2" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-gray-200">
+                            <div class="flex justify-between text-slate-300">
+                                <span>Bay of Bengal</span>
+                                <span class="font-bold text-rose-400">82% (Critical)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 rounded-full h-1.5 mt-0.5">
+                                <div class="bg-rose-500 h-1.5 rounded-full" style="width: 82%"></div>
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-gray-400 mb-1">Center Lon (°E)</label>
-                            <input id="lonInput" type="number" step="0.1" value="84.6" class="w-full bg-gray-900 border border-gray-700 rounded p-2 text-gray-200">
+                            <div class="flex justify-between text-slate-300">
+                                <span>Arabian Sea</span>
+                                <span class="font-bold text-amber-400">31% (Moderate)</span>
+                            </div>
+                            <div class="w-full bg-slate-800 rounded-full h-1.5 mt-0.5">
+                                <div class="bg-amber-400 h-1.5 rounded-full" style="width: 31%"></div>
+                            </div>
                         </div>
                     </div>
-                    <button onclick="runAnalysis()" class="w-full bg-gray-800 hover:bg-gray-700 text-cyan-400 border border-cyan-700/50 font-bold py-2.5 rounded shadow transition">
-                        Run Model Forecast
-                    </button>
+                </div>
+
+                <!-- Multi-Source Data Fusion Status (Feature 02 & 20) -->
+                <div class="glass-card p-4 rounded-2xl border-emerald-900/40">
+                    <div class="flex justify-between items-center text-xs mb-2">
+                        <span class="text-emerald-400 font-bold uppercase flex items-center gap-1">🛰️ Multi-Source Fusion</span>
+                        <span class="text-[10px] text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">96% Synced</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1.5 text-[10px] text-slate-300">
+                        <div class="flex items-center gap-1"><span>🟢</span> INSAT-3D/3DR</div>
+                        <div class="flex items-center gap-1"><span>🟢</span> NOAA ERSSTv6</div>
+                        <div class="flex items-center gap-1"><span>🟢</span> NASA TROPICS</div>
+                        <div class="flex items-center gap-1"><span>🟢</span> MERRA-2 VWS</div>
+                    </div>
+                    <div class="text-[10px] text-slate-500 mt-2">Latency: <b>02:14 min</b> • Model: <b>v2.4.1</b></div>
                 </div>
             </div>
 
-            <!-- Current Dynamics -->
-            <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
-                <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-4">📊 Intensity & Central Pressure</h2>
-                <div class="grid grid-cols-2 gap-3 text-center">
-                    <div class="bg-gray-900/80 p-3 rounded border border-gray-800">
-                        <div class="text-xs text-gray-400">Wind Velocity</div>
-                        <div id="metricWind" class="text-lg font-black text-cyan-400">88.8 kts</div>
-                        <div id="metricKmph" class="text-[10px] text-gray-500">164.5 km/h</div>
+            <!-- Central Grid: Controls + WebGIS Map + Impact Matrix -->
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+                <!-- Col 1: Interactive Synoptic Ingestion & Tools -->
+                <div class="space-y-4">
+                    <!-- Synoptic Control Card -->
+                    <div class="glass-card p-4 rounded-2xl space-y-3">
+                        <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+                            <span>⚙️</span> Synoptic Parameter Tuning
+                        </h3>
+                        <div class="space-y-2.5 text-xs">
+                            <div>
+                                <label class="text-slate-400 block mb-1">Ocean Basin</label>
+                                <select id="basinSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200">
+                                    <option value="Bay of Bengal">Bay of Bengal (BoB)</option>
+                                    <option value="Arabian Sea">Arabian Sea (AS)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-slate-400 mb-1">
+                                    <span>Dvorak Intensity</span>
+                                    <span id="tNoVal" class="text-cyan-400 font-bold font-mono-code">T4.5</span>
+                                </div>
+                                <input id="intensitySlider" type="range" min="1.5" max="7.5" step="0.5" value="4.5" class="w-full accent-cyan-400 cursor-pointer">
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-slate-400 block mb-1">Center Lat (°N)</label>
+                                    <input id="latInput" type="number" step="0.1" value="16.2" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 font-mono-code">
+                                </div>
+                                <div>
+                                    <label class="text-slate-400 block mb-1">Center Lon (°E)</label>
+                                    <input id="lonInput" type="number" step="0.1" value="84.6" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200 font-mono-code">
+                                </div>
+                            </div>
+                            <button onclick="runAnalysis()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2.5 rounded-xl shadow glow-cyan transition flex items-center justify-center gap-2">
+                                <span>⚡</span> Run Neural Forecast
+                            </button>
+                        </div>
                     </div>
-                    <div class="bg-gray-900/80 p-3 rounded border border-gray-800">
-                        <div class="text-xs text-gray-400">Central Pressure</div>
-                        <div id="metricPress" class="text-lg font-black text-emerald-400">968.6 hPa</div>
-                        <div id="metricDeficit" class="text-[10px] text-gray-500">Deficit: 41.4 hPa</div>
+
+                    <!-- Satellite Upload & Center Auto-Detection (Feature 03) -->
+                    <div class="glass-card p-4 rounded-2xl space-y-2.5">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🛰️</span> Auto Center Fix (LLCC)
+                            </h3>
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800">CNN Eyewall</span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Upload raw INSAT/TROPICS image to detect center coordinates & eye symmetry:</p>
+                        <input type="file" id="imageInput" accept="image/*" class="w-full text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-cyan-700 file:text-white hover:file:bg-cyan-600 cursor-pointer">
+                        <button onclick="uploadSatelliteImage()" class="w-full bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-800/60 font-semibold py-2 rounded-xl text-xs transition">
+                            Detect Center & Predict Intensity
+                        </button>
+                        <div id="uploadFeedback" class="hidden text-[11px] p-2.5 rounded-lg bg-cyan-950/60 border border-cyan-800 text-cyan-200 space-y-1"></div>
                     </div>
-                    <div class="bg-gray-900/80 p-3 rounded border border-gray-800 col-span-2">
-                        <div class="text-xs text-gray-400">IMD Classification</div>
-                        <div id="metricStage" class="text-sm font-bold text-yellow-400">Very Severe Cyclonic Storm (VSCS)</div>
+
+                    <!-- Location Risk Search (Feature 13) -->
+                    <div class="glass-card p-4 rounded-2xl space-y-2.5">
+                        <h3 class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>📍</span> Check Your City / District Risk
+                        </h3>
+                        <div class="flex gap-2">
+                            <input id="inputCityQuery" type="text" placeholder="e.g. Visakhapatnam, Puri" value="Visakhapatnam" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white">
+                            <button onclick="queryCityRisk()" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-3 rounded-lg font-bold transition">
+                                Check
+                            </button>
+                        </div>
+                        <div id="cityRiskResult" class="text-[11px] p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 space-y-1">
+                            <div class="flex justify-between"><span class="text-slate-400">Current Risk:</span> <b class="text-rose-400">CRITICAL</b></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Impact Window:</span> <b class="text-white">18–24 Hours</b></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Wind Threat:</span> <b class="text-cyan-300">90–120 km/h</b></div>
+                            <div class="flex justify-between"><span class="text-slate-400">Safe Shelters:</span> <b class="text-emerald-400">28 Operational</b></div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Rapid Intensification Card -->
-            <div class="glass-panel border border-red-900/60 p-4 rounded-xl bg-red-950/20">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-red-400 uppercase">⚡ Rapid Intensification (RI)</span>
-                    <span id="riProb" class="text-xs font-extrabold text-red-300">82% Probability</span>
+                <!-- Col 2 & 3: WebGIS Trajectory Map (Features 06, 07, 11) -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="glass-card p-4 rounded-2xl space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-2">
+                                    <span>🗺️</span> Real-Time Trajectory & Uncertainty Cone
+                                </h2>
+                                <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">Ensemble Track</span>
+                            </div>
+
+                            <div class="flex items-center gap-2 text-xs">
+                                <label class="text-slate-400">Layer:</label>
+                                <select id="mapLayerSelect" onchange="switchMapLayer()" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-cyan-400 text-xs">
+                                    <option value="satellite">High-Res Satellite View</option>
+                                    <option value="dark">Dark Meteorological Grid</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Leaflet Canvas -->
+                        <div id="map"></div>
+
+                        <!-- Map Legend & Model Verification Quick Bar (Feature 18) -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
+                            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500"></span> Eye Center</div>
+                            <div class="flex items-center gap-1.5"><span class="w-3 h-1 bg-cyan-400"></span> Predicted Path</div>
+                            <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-cyan-500/20 border border-cyan-400"></span> Uncertainty Cone</div>
+                            <div class="text-right text-slate-400">24h Track Error: <b class="text-emerald-400 font-mono-code">42 km</b></div>
+                        </div>
+                    </div>
+
+                    <!-- Explainable AI (XAI) & Heatmap Attribution (Feature 10) -->
+                    <div class="glass-card p-4 rounded-2xl border-purple-900/40 bg-purple-950/10 space-y-2.5">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                                <span>🧠</span> Explainable AI (XAI) — Prediction Attribution Drivers
+                            </h3>
+                            <span class="text-[10px] bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded border border-purple-700">Grad-CAM Spatial Weights</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs">
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <div class="text-slate-400 text-[10px]">Cloud Symmetry</div>
+                                <div class="text-sm font-bold text-purple-300">31%</div>
+                                <div class="w-full bg-slate-800 h-1 rounded-full mt-1"><div class="bg-purple-500 h-1 rounded-full" style="width: 31%"></div></div>
+                            </div>
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <div class="text-slate-400 text-[10px]">SST Thermal Fuel</div>
+                                <div class="text-sm font-bold text-cyan-300">24%</div>
+                                <div class="w-full bg-slate-800 h-1 rounded-full mt-1"><div class="bg-cyan-500 h-1 rounded-full" style="width: 24%"></div></div>
+                            </div>
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <div class="text-slate-400 text-[10px]">Moisture Inflow</div>
+                                <div class="text-sm font-bold text-teal-300">18%</div>
+                                <div class="w-full bg-slate-800 h-1 rounded-full mt-1"><div class="bg-teal-500 h-1 rounded-full" style="width: 18%"></div></div>
+                            </div>
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <div class="text-slate-400 text-[10px]">Shear Environment</div>
+                                <div class="text-sm font-bold text-amber-300">15%</div>
+                                <div class="w-full bg-slate-800 h-1 rounded-full mt-1"><div class="bg-amber-500 h-1 rounded-full" style="width: 15%"></div></div>
+                            </div>
+                            <div class="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                                <div class="text-slate-400 text-[10px]">Pressure Gradient</div>
+                                <div class="text-sm font-bold text-rose-300">12%</div>
+                                <div class="w-full bg-slate-800 h-1 rounded-full mt-1"><div class="bg-rose-500 h-1 rounded-full" style="width: 12%"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gemini Synoptic Reasoning -->
+                    <div class="glass-card p-4 rounded-2xl border-purple-900/60 bg-purple-950/15 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+                                <span>🧠</span> Gemini AI Meteorological Synoptic Analysis
+                            </h3>
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-purple-900/70 text-purple-300 border border-purple-700">MoES Decision Synthesis</span>
+                        </div>
+                        <div id="geminiText" class="text-xs text-slate-300 space-y-1.5 whitespace-pre-line leading-relaxed">
+                            Loading Gemini AI synoptic analysis...
+                        </div>
+                    </div>
                 </div>
-                <p id="riDesc" class="text-xs text-gray-300 mt-2">
-                    Warm Ocean Heat Content (95 kJ/cm²) & low shear (7.5 kts) confirm high explosive strengthening potential within 24h.
-                </p>
-            </div>
-        </div>
 
-        <!-- Right 2 Columns: Map, Gemini AI Reasoning & Landfall -->
-        <div class="lg:col-span-2 space-y-6">
-            <!-- Map Card with Layer Toggle -->
-            <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
-                <div class="flex items-center justify-between mb-3">
-                    <h2 class="text-sm font-bold text-gray-300 uppercase tracking-wider flex items-center gap-2">
-                        <span>🗺️</span> Real-Time Trajectory & Satellite Layer
-                    </h2>
-                    <div class="flex items-center gap-2 text-xs">
-                        <label class="text-gray-400">Map Layer:</label>
-                        <select id="mapLayerSelect" onchange="switchMapLayer()" class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-cyan-400">
-                            <option value="satellite">High-Res Satellite View</option>
-                            <option value="dark">Dark Meteorological Grid</option>
+                <!-- Col 4: Population Impact, What-If Simulator & Historical Analogs -->
+                <div class="space-y-4">
+                    <!-- Population & Infrastructure Exposure (Feature 12) -->
+                    <div class="glass-card p-4 rounded-2xl space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🏥</span> Infrastructure Impact
+                            </h3>
+                            <span class="text-[10px] text-rose-300 font-bold">2.4M At Risk</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800">
+                                <span class="text-slate-400 text-[10px] block">🏥 Hospitals</span>
+                                <span class="text-sm font-black text-rose-400 font-mono-code">24 Facilities</span>
+                            </div>
+                            <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800">
+                                <span class="text-slate-400 text-[10px] block">🏫 Schools (Shelters)</span>
+                                <span class="text-sm font-black text-amber-400 font-mono-code">186 Safe Hubs</span>
+                            </div>
+                            <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800">
+                                <span class="text-slate-400 text-[10px] block">🛣️ Highways</span>
+                                <span class="text-sm font-black text-cyan-400 font-mono-code">412 km</span>
+                            </div>
+                            <div class="bg-slate-900/70 p-2 rounded-lg border border-slate-800">
+                                <span class="text-slate-400 text-[10px] block">⚓ Major Ports</span>
+                                <span class="text-sm font-black text-purple-400 font-mono-code">4 Ports</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- What-If Scenario Sandbox (Feature 21) -->
+                    <div class="glass-card p-4 rounded-2xl border-teal-900/40 bg-teal-950/15 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xs font-bold text-teal-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <span>🧪</span> What-If Scenario Simulator
+                            </h3>
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-teal-900 text-teal-200">Interactive</span>
+                        </div>
+                        <div class="space-y-2 text-xs">
+                            <div>
+                                <div class="flex justify-between text-slate-400 text-[11px] mb-0.5">
+                                    <span>Sea Surface Temp (SST)</span>
+                                    <span id="labelWhatIfSST" class="text-teal-400 font-bold">+1.0 °C</span>
+                                </div>
+                                <input id="sliderWhatIfSST" type="range" min="-2.0" max="3.0" step="0.5" value="1.0" class="w-full accent-teal-400 cursor-pointer" oninput="runWhatIfSimulation()">
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-slate-400 text-[11px] mb-0.5">
+                                    <span>Vertical Wind Shear</span>
+                                    <span id="labelWhatIfShear" class="text-cyan-400 font-bold">-10 kts</span>
+                                </div>
+                                <input id="sliderWhatIfShear" type="range" min="-20" max="20" step="5" value="-10" class="w-full accent-cyan-400 cursor-pointer" oninput="runWhatIfSimulation()">
+                            </div>
+                            <div id="whatIfResult" class="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] space-y-1">
+                                <div class="text-slate-300">Simulated Wind Change: <b class="text-rose-400 font-mono-code">+12 km/h</b></div>
+                                <div class="text-slate-400">Risk Escalation: <b class="text-amber-400">MODERATE ➔ HIGH</b></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historical Cyclone Replay Player (Feature 17) -->
+                    <div class="glass-card p-4 rounded-2xl space-y-2.5">
+                        <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🔄</span> Historical Cyclone Replay
+                        </h3>
+                        <select id="selectReplayEvent" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" onchange="loadHistoricalEvent()">
+                            <option value="fani_2019">Cyclone FANI (2019) — Puri Landfall</option>
+                            <option value="amphan_2020">Super Cyclone AMPHAN (2020)</option>
+                            <option value="biparjoy_2023">Cyclone BIPARJOY (2023) — Gujarat</option>
                         </select>
+                        <div class="flex items-center justify-between pt-1">
+                            <button onclick="prevReplayStep()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs">◀ Prev</button>
+                            <button onclick="toggleReplayPlay()" id="btnPlayReplay" class="px-4 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs">▶ Play</button>
+                            <button onclick="nextReplayStep()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs">Next ▶</button>
+                        </div>
+                        <div id="replayInfo" class="text-[10px] text-slate-400 text-center pt-1 font-mono-code">Step 1 of 4 • T-72h (Formation)</div>
+                    </div>
+
+                    <!-- Historical Analogs -->
+                    <div class="glass-card p-4 rounded-2xl space-y-2">
+                        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">📚 Historical Analogs</h3>
+                        <div id="analogList" class="space-y-1.5 text-xs max-h-48 overflow-y-auto"></div>
                     </div>
                 </div>
-                <div id="map"></div>
             </div>
 
-            <!-- Gemini / LLM Meteorological Reasoning Panel -->
-            <div class="glass-panel border border-purple-900/60 p-5 rounded-xl shadow-lg bg-purple-950/15">
-                <div class="flex justify-between items-center mb-2">
-                    <h3 class="text-sm font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
-                        <span>🧠</span> Gemini AI Meteorological Synoptic Analysis
+            <!-- Coastal District Vulnerability & Storm Surge -->
+            <div class="glass-card p-4 rounded-2xl border-yellow-800/50 bg-yellow-950/10 space-y-3">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xs font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-2">
+                        <span>🚨</span> Coastal Vulnerability & District Surge Matrix (NDMA Directives)
                     </h3>
-                    <span class="text-[10px] px-2 py-0.5 rounded bg-purple-900/70 text-purple-300 border border-purple-700">AI Synoptic Reasoning</span>
-                </div>
-                <div id="geminiText" class="text-xs text-gray-300 space-y-2 whitespace-pre-line leading-relaxed">
-                    Loading Gemini AI synoptic analysis...
-                </div>
-            </div>
-
-            <!-- District-Level Coastal Vulnerability & Storm Surge -->
-            <div class="glass-panel border border-yellow-800/50 p-5 rounded-xl bg-yellow-950/10">
-                <div class="flex justify-between items-center mb-3">
-                    <h3 class="text-sm font-bold text-yellow-400 uppercase tracking-wider flex items-center gap-2">
-                        <span>🚨</span> Coastal Vulnerability & District Surge Matrix
-                    </h3>
-                    <span class="text-[11px] text-gray-400">NDMA Evacuation Decision Matrix</span>
+                    <span class="text-[11px] text-slate-400">Disaster Decision Matrix</span>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs text-gray-300">
-                        <thead class="bg-gray-900/80 text-gray-400 uppercase text-[10px]">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-900/80 text-slate-400 uppercase text-[10px]">
                             <tr>
                                 <th class="p-2">Coastal District</th>
                                 <th class="p-2">Expected Storm Surge</th>
@@ -196,23 +440,190 @@
                                 <th class="p-2">Threat Level</th>
                             </tr>
                         </thead>
-                        <tbody id="districtTableBody" class="divide-y divide-gray-800"></tbody>
+                        <tbody id="districtTableBody" class="divide-y divide-slate-800"></tbody>
                     </table>
                 </div>
-                <div class="mt-4 p-3 rounded bg-gray-900 border border-gray-800 flex justify-between items-center text-xs">
+                <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800 flex justify-between items-center text-xs">
                     <div>
-                        <span class="text-gray-400 font-bold">📲 Automated NDMA Broadcast:</span>
-                        <p id="ndmaSms" class="text-gray-300 mt-1 italic"></p>
+                        <span class="text-slate-400 font-bold">📲 Automated NDMA Broadcast:</span>
+                        <p id="ndmaSms" class="text-slate-300 mt-0.5 italic"></p>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- Historical Analogs -->
-            <div class="glass-panel border border-gray-800 p-5 rounded-xl shadow-lg">
-                <h3 class="text-sm font-bold text-gray-300 uppercase tracking-wider mb-3">📚 Historical Cyclone Analogs (Similarity Engine)</h3>
-                <div id="analogList" class="space-y-2 text-xs"></div>
+        <!-- 2. CITIZEN SHIELD MODE (Feature 15 — Positive Life-Saving View) -->
+        <div id="viewCitizenShield" class="hidden space-y-6 max-w-4xl mx-auto">
+            <div class="glass-card p-8 rounded-3xl border-emerald-500/30 bg-gradient-to-br from-slate-950 via-[#0a1a24] to-slate-950 glow-emerald text-center space-y-4">
+                <div class="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center text-3xl mx-auto">
+                    🛡️
+                </div>
+                <h2 class="text-2xl font-black text-white">You Are Under CycloVision AI Early Shield</h2>
+                <p class="text-sm text-slate-300 max-w-xl mx-auto">
+                    Real-time safety guidance powered by the Ministry of Earth Sciences and India Meteorological Department.
+                </p>
+
+                <!-- Status Card -->
+                <div class="bg-slate-900/90 border border-slate-700 p-5 rounded-2xl max-w-lg mx-auto text-left space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-400">Detected Location:</span>
+                        <span class="text-xs font-bold text-cyan-300">Visakhapatnam Coastline</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-400">Risk Assessment:</span>
+                        <span class="px-2.5 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-800 text-xs font-bold">HIGH RISK • VERY SEVERE</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-slate-400">Expected Landfall Impact:</span>
+                        <span class="text-xs font-bold text-white">Within 18–24 Hours</span>
+                    </div>
+                </div>
+
+                <!-- Actionable Directives -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-left pt-3">
+                    <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                        <div class="text-lg mb-1">🏠</div>
+                        <h4 class="font-bold text-xs text-white">Stay Indoors</h4>
+                        <p class="text-[11px] text-slate-400 mt-1">Keep away from glass windows and loose metal sheets.</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                        <div class="text-lg mb-1">🔋</div>
+                        <h4 class="font-bold text-xs text-white">Emergency Kit Ready</h4>
+                        <p class="text-[11px] text-slate-400 mt-1">Keep drinking water, flashlights, medicines, and phone charged.</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+                        <div class="text-lg mb-1">🚶</div>
+                        <h4 class="font-bold text-xs text-white">Follow Evacuation</h4>
+                        <p class="text-[11px] text-slate-400 mt-1">Low-lying 5 km coastal residents should move to nearest cyclone shelters.</p>
+                    </div>
+                </div>
+
+                <!-- Quick Action Buttons -->
+                <div class="flex justify-center gap-4 pt-4">
+                    <button onclick="alert('Navigating to nearest 28 Cyclone Shelters in Visakhapatnam region.')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-6 py-3 rounded-xl shadow glow-emerald text-xs transition">
+                        🏥 Find Nearest Cyclone Shelter (28 Active)
+                    </button>
+                    <button onclick="playVoiceAlert()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-700/60 font-bold px-6 py-3 rounded-xl text-xs transition">
+                        🔊 Play Voice Safety Guide
+                    </button>
+                </div>
             </div>
         </div>
+
+        <!-- 3. EXPERT / HITL COMMAND CENTER (Feature 16 & 22) -->
+        <div id="viewExpertCenter" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Multi-Model Comparison (Feature 16) -->
+                <div class="glass-card p-5 rounded-2xl space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider">🤖 Multi-Model Ensemble Benchmark</h3>
+                        <span class="text-[10px] text-emerald-400">Ensemble Conf: 82%</span>
+                    </div>
+                    <div class="space-y-3 text-xs">
+                        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                            <div class="flex justify-between font-bold text-slate-200">
+                                <span>CNN Deep Dvorak</span>
+                                <span class="text-cyan-400 font-mono-code">143 km/h</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Focuses on eyewall brightness temperature gradient.</p>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                            <div class="flex justify-between font-bold text-slate-200">
+                                <span>ConvLSTM Spatio-Temporal</span>
+                                <span class="text-teal-400 font-mono-code">147 km/h</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Captures sequential vortex angular rotation rate.</p>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                            <div class="flex justify-between font-bold text-slate-200">
+                                <span>Physics-Informed Transformer</span>
+                                <span class="text-purple-400 font-mono-code">145 km/h</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 mt-0.5">Constrained by SST thermodynamic upper limits.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Human-in-the-Loop Validation (Feature 22) -->
+                <div class="glass-card p-5 rounded-2xl space-y-4">
+                    <h3 class="text-xs font-bold text-amber-300 uppercase tracking-wider">🧑‍💼 Human-in-the-Loop (HITL) Validation</h3>
+                    <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+                        <div class="flex justify-between text-slate-300">
+                            <span>Pending Storm ID:</span> <b class="text-cyan-400 font-mono-code">AUD-1051 (CYCLONE-X)</b>
+                        </div>
+                        <div class="flex justify-between text-slate-300">
+                            <span>AI Intensity Prediction:</span> <b class="text-white font-mono-code">138 km/h (VSCS)</b>
+                        </div>
+                        <div class="flex justify-between text-slate-300">
+                            <span>AI Track Vector:</span> <b class="text-white font-mono-code">NNW (330°) @ 14 km/h</b>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-slate-400 block text-xs mb-1">Chief Forecaster Remarks</label>
+                        <textarea id="hitlNotes" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white" placeholder="Add synoptic reasoning or calibration notes..."></textarea>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="submitHITL('APPROVED')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 rounded-lg text-xs transition">
+                            ✓ Approve
+                        </button>
+                        <button onclick="submitHITL('MODIFIED')" class="bg-amber-600 hover:bg-amber-500 text-white font-bold py-2 rounded-lg text-xs transition">
+                            ✏️ Modify
+                        </button>
+                        <button onclick="submitHITL('FLAGGED')" class="bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 rounded-lg text-xs transition">
+                            ⚠️ Flag
+                        </button>
+                    </div>
+                    <div id="hitlStatus" class="text-[11px] text-emerald-400 hidden">✓ Expert validation logged into audit ledger.</div>
+                </div>
+
+                <!-- Prediction Audit Trail (Feature 23) -->
+                <div class="glass-card p-5 rounded-2xl space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">📝 Prediction Audit Trail</h3>
+                        <span class="text-[10px] text-slate-500 font-mono-code">Immutable Ledger</span>
+                    </div>
+                    <div class="overflow-y-auto max-h-64 space-y-2 text-xs" id="auditTrailList">
+                        <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800">
+                            <div class="flex justify-between text-slate-400 text-[10px]">
+                                <span>14:00 UTC • AUD-1049</span>
+                                <span class="text-emerald-400 font-bold">APPROVED</span>
+                            </div>
+                            <div class="font-bold text-white mt-1">128 km/h • Track NW</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">Inputs: INSAT-3D, ERSSTv6, MERRA-2</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. EMERGENCY 2G / LOW-BANDWIDTH MODE (Feature 25) -->
+        <div id="viewEmergencyMode" class="hidden max-w-2xl mx-auto space-y-4">
+            <div class="bg-black border-2 border-amber-500 p-6 rounded-2xl text-amber-400 font-mono-code space-y-4">
+                <div class="flex justify-between items-center border-b border-amber-900 pb-2">
+                    <span class="font-bold text-base">EMERGENCY MODE • WEAK NETWORK</span>
+                    <span class="text-xs bg-amber-950 px-2 py-0.5 rounded border border-amber-700">TEXT ONLY • 2G OPTIMIZED</span>
+                </div>
+                <div class="space-y-2 text-sm text-white">
+                    <div>🚨 ALERT: <b>CRITICAL CYCLONE WARNING</b></div>
+                    <div>📍 TARGET LOCATION: <b>VISAKHAPATNAM - PURI COAST</b></div>
+                    <div>⏱️ TIME TO IMPACT: <b>18–24 HOURS</b></div>
+                    <div>💨 WIND VELOCITY: <b>90–120 KM/H</b></div>
+                    <div>🌊 SURGE THREAT: <b>3.8 METERS</b></div>
+                </div>
+                <div class="p-3 bg-amber-950/40 border border-amber-800 rounded text-xs text-amber-200">
+                    ADVISORY: Evacuate low-lying areas within 5 km of coast immediately. Move to government concrete shelters.
+                </div>
+                <div class="flex justify-between pt-2 text-xs">
+                    <button onclick="alert('Shelter list loaded.')" class="bg-amber-500 text-black font-bold px-4 py-2 rounded">
+                        [ VIEW SHELTERS ]
+                    </button>
+                    <button onclick="setUIMode('command')" class="text-amber-400 underline">
+                        Back to Full Command View
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <!-- Modal for Bulletin -->
@@ -231,6 +642,8 @@
 
     <script>
         let map, currentTileLayer, trackPolyline, conePolygons = [], centerMarker;
+        let replayStepIndex = 0;
+        let replayInterval = null;
 
         const tileLayers = {
             satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -238,9 +651,9 @@
         };
 
         function initMap() {
-            map = L.map('map').setView([17.0, 84.0], 6);
+            map = L.map('map').setView([16.2, 84.6], 6);
             currentTileLayer = L.tileLayer(tileLayers.satellite, {
-                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+                attribution: 'Esri World Imagery',
                 maxZoom: 18
             }).addTo(map);
         }
@@ -252,6 +665,200 @@
                 attribution: selected === 'satellite' ? 'Esri World Imagery' : '&copy; CARTO',
                 maxZoom: 18
             }).addTo(map);
+        }
+
+        // Mode Switching (Feature 01, 15, 16, 25)
+        function setUIMode(mode) {
+            ['command', 'citizen', 'expert', 'emergency'].forEach(m => {
+                const btn = document.getElementById('btnMode' + m.charAt(0).toUpperCase() + m.slice(1));
+                if (btn) {
+                    btn.className = (m === mode) ? 'px-3 py-1.5 rounded-lg bg-cyan-600 text-white shadow' : 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+                }
+            });
+
+            document.getElementById('viewCommandCenter').classList.toggle('hidden', mode !== 'command');
+            document.getElementById('viewCitizenShield').classList.toggle('hidden', mode !== 'citizen');
+            document.getElementById('viewExpertCenter').classList.toggle('hidden', mode !== 'expert');
+            document.getElementById('viewEmergencyMode').classList.toggle('hidden', mode !== 'emergency');
+
+            if (mode === 'command') {
+                setTimeout(() => { map.invalidateSize(); }, 200);
+            }
+        }
+
+        // Voice Alert (Feature 24 - Web Speech API in 5 Languages)
+        function playVoiceAlert() {
+            const lang = document.getElementById('langSelect').value;
+            const messages = {
+                en: "High cyclone risk detected in your area. Please stay indoors and follow official evacuation instructions.",
+                hi: "आपके क्षेत्र में चक्रवात का उच्च जोखिम पाया गया है। कृपया घर के अंदर रहें और सरकारी निर्देशों का पालन करें।",
+                bn: "আপনার এলাকায় ঘূর্ণিঝড়ের উচ্চ ঝুঁকি সনাক্ত করা হয়েছে। দয়া করে ঘরে থাকুন এবং সতর্কতা অবলম্বন করুন।",
+                te: "మీ ప్రాంతంలో తుఫాను తీవ్ర ప్రభావం చూపే ప్రమాదం ఉంది. దయచేసి సురక్షిత ప్రాంతాలలో ఉండండి.",
+                or: "ଆପଣଙ୍କ ଅଞ୍ଚଳରେ ବାତ୍ୟାର ଗୁରୁତର ବିପଦ ଚିହ୍ନଟ ହୋଇଛି। ଦୟାକରି ସୁରକ୍ଷିତ ଆଶ୍ରୟସ୍ଥଳରେ ରୁହନ୍ତୁ।"
+            };
+
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(messages[lang] || messages['en']);
+                utterance.lang = lang === 'hi' ? 'hi-IN' : lang === 'bn' ? 'bn-IN' : lang === 'te' ? 'te-IN' : 'en-US';
+                utterance.rate = 0.95;
+                window.speechSynthesis.speak(utterance);
+            } else {
+                alert(messages[lang] || messages['en']);
+            }
+        }
+
+        // What-If Simulator (Feature 21)
+        async function runWhatIfSimulation() {
+            const sst = parseFloat(document.getElementById('sliderWhatIfSST').value);
+            const shear = parseFloat(document.getElementById('sliderWhatIfShear').value);
+            document.getElementById('labelWhatIfSST').innerText = `${sst > 0 ? '+' : ''}${sst.toFixed(1)} °C`;
+            document.getElementById('labelWhatIfShear').innerText = `${shear > 0 ? '+' : ''}${shear} kts`;
+
+            try {
+                const res = await fetch('/api/what-if', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sst_delta: sst,
+                        shear_delta: shear,
+                        moisture_delta: 5.0,
+                        base_wind_kmph: 120.0
+                    })
+                });
+                const data = await res.json();
+                const box = document.getElementById('whatIfResult');
+                box.innerHTML = `
+                    <div class="text-slate-300">Simulated Wind: <b class="text-rose-400 font-mono-code">${data.simulated_wind_kmph} km/h</b> (${data.wind_delta_kmph > 0 ? '+' : ''}${data.wind_delta_kmph} km/h)</div>
+                    <div class="text-slate-400">Risk Escalation: <b class="${data.simulated_risk_level === 'EXTREME' ? 'text-rose-400' : 'text-amber-400'}">${data.simulated_risk_level}</b></div>
+                `;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Historical Replay (Feature 17)
+        let currentReplaySteps = [
+            {time_label: "T-72h (Formation)", lat: 10.2, lon: 87.5, wind_kmph: 85},
+            {time_label: "T-48h (Intensification)", lat: 13.5, lon: 85.8, wind_kmph: 140},
+            {time_label: "T-24h (Peak Strength)", lat: 17.1, lon: 85.0, wind_kmph: 205},
+            {time_label: "NOW (Landfall)", lat: 19.8, lon: 85.8, wind_kmph: 215}
+        ];
+
+        async function loadHistoricalEvent() {
+            const key = document.getElementById('selectReplayEvent').value;
+            try {
+                const res = await fetch(`/api/historical-replay/${key}`);
+                const data = await res.json();
+                currentReplaySteps = data.steps;
+                replayStepIndex = 0;
+                applyReplayStep();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function nextReplayStep() {
+            replayStepIndex = (replayStepIndex + 1) % currentReplaySteps.length;
+            applyReplayStep();
+        }
+
+        function prevReplayStep() {
+            replayStepIndex = (replayStepIndex - 1 + currentReplaySteps.length) % currentReplaySteps.length;
+            applyReplayStep();
+        }
+
+        function applyReplayStep() {
+            const cur = currentReplaySteps[replayStepIndex];
+            document.getElementById('replayInfo').innerText = `Step ${replayStepIndex + 1} of ${currentReplaySteps.length} • ${cur.time_label} (${cur.wind_kmph} km/h)`;
+            
+            clearMapLayers();
+            centerMarker = L.circleMarker([cur.lat, cur.lon], {
+                radius: 11,
+                color: '#f43f5e',
+                fillColor: '#e11d48',
+                fillOpacity: 0.9,
+                weight: 2
+            }).addTo(map).bindPopup(`<b>Historical Step</b><br>${cur.time_label}<br>Wind: ${cur.wind_kmph} km/h`).openPopup();
+            map.panTo([cur.lat, cur.lon]);
+        }
+
+        function toggleReplayPlay() {
+            const btn = document.getElementById('btnPlayReplay');
+            if (replayInterval) {
+                clearInterval(replayInterval);
+                replayInterval = null;
+                btn.innerText = "▶ Play";
+            } else {
+                btn.innerText = "⏸ Pause";
+                replayInterval = setInterval(() => { nextReplayStep(); }, 1800);
+            }
+        }
+
+        // City Search (Feature 13)
+        async function queryCityRisk() {
+            const city = document.getElementById('inputCityQuery').value;
+            const resBox = document.getElementById('cityRiskResult');
+            try {
+                const res = await fetch('/api/location-risk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ city_name: city, storm_lat: 16.2, storm_lon: 84.6, storm_wind_kmph: 145.0 })
+                });
+                const data = await res.json();
+                resBox.innerHTML = `
+                    <div class="flex justify-between"><span class="text-slate-400">${data.city_name} Risk:</span> <b class="text-rose-400">${data.current_risk}</b></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Impact Window:</span> <b class="text-white">${data.expected_impact_time}</b></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Wind Forecast:</span> <b class="text-cyan-300">${data.expected_wind_range}</b></div>
+                    <div class="flex justify-between"><span class="text-slate-400">Shelters:</span> <b class="text-emerald-400">${data.nearest_cyclone_shelters} Active Hubs</b></div>
+                `;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // HITL validation (Feature 22)
+        async function submitHITL(decision) {
+            const notes = document.getElementById('hitlNotes').value;
+            try {
+                const res = await fetch('/api/hitl/review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audit_id: "AUD-1051", decision: decision, forecaster_notes: notes || "Reviewed by Senior Forecaster." })
+                });
+                const data = await res.json();
+                const status = document.getElementById('hitlStatus');
+                status.classList.remove('hidden');
+                status.innerText = `✓ Prediction ${decision} recorded into immutable audit ledger.`;
+                loadAuditTrail();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadAuditTrail() {
+            try {
+                const res = await fetch('/api/audit-trail');
+                const list = await res.json();
+                const container = document.getElementById('auditTrailList');
+                if (container) {
+                    container.innerHTML = '';
+                    list.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'p-2.5 rounded-lg bg-slate-900/60 border border-slate-800';
+                        div.innerHTML = `
+                            <div class="flex justify-between text-slate-400 text-[10px]">
+                                <span>${item.timestamp} • ${item.id}</span>
+                                <span class="${item.status === 'APPROVED' ? 'text-emerald-400' : item.status === 'FLAGGED' ? 'text-rose-400' : 'text-amber-400'} font-bold">${item.status}</span>
+                            </div>
+                            <div class="font-bold text-white mt-1">${item.intensity_kmph} km/h • Track ${item.track_heading}</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">${item.forecaster_notes}</div>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         async function runAnalysis() {
@@ -314,11 +921,12 @@
 
         function updateDashboard(data) {
             const m = data.storm_metadata;
-            document.getElementById('metricWind').innerText = `${m.estimated_wind_knots} kts`;
+            document.getElementById('metricWind').innerText = `(${m.estimated_wind_knots} kts)`;
             document.getElementById('metricKmph').innerText = `${m.estimated_wind_kmph} km/h`;
             document.getElementById('metricPress').innerText = `${m.central_pressure_hpa} hPa`;
             document.getElementById('metricDeficit').innerText = `Deficit: ${m.pressure_deficit_hpa} hPa`;
             document.getElementById('metricStage').innerText = m.imd_stage;
+            document.getElementById('statCoords').innerText = `${m.current_center.lat}°N, ${m.current_center.lon}°E`;
             
             const badge = document.getElementById('alertBadge');
             badge.innerText = `${m.alert_level} ALERT`;
@@ -343,11 +951,11 @@
             if (data.landfall_risk.vulnerable_districts) {
                 data.landfall_risk.vulnerable_districts.forEach(d => {
                     const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-gray-900/50';
+                    tr.className = 'hover:bg-slate-900/50';
                     tr.innerHTML = `
-                        <td class="p-2 font-bold text-gray-200">${d.district}</td>
+                        <td class="p-2 font-bold text-slate-200">${d.district}</td>
                         <td class="p-2 text-cyan-400">${d.surge_m} m</td>
-                        <td class="p-2 text-gray-400">${d.pop_exposure}</td>
+                        <td class="p-2 text-slate-400">${d.pop_exposure}</td>
                         <td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${d.risk === 'CRITICAL' ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-yellow-950 text-yellow-400'}">${d.risk}</span></td>
                     `;
                     tbody.appendChild(tr);
@@ -361,12 +969,12 @@
             const lat = m.current_center.lat;
             const lon = m.current_center.lon;
             centerMarker = L.circleMarker([lat, lon], {
-                radius: 10,
+                radius: 11,
                 color: '#ef4444',
                 fillColor: '#dc2626',
                 fillOpacity: 0.95,
                 weight: 2
-            }).addTo(map).bindPopup(`<b>${m.system_name}</b><br>Stage: ${m.imd_stage_code}<br>Wind: ${m.estimated_wind_knots} kts`).openPopup();
+            }).addTo(map).bindPopup(`<b>${m.system_name}</b><br>Stage: ${m.imd_stage_code}<br>Wind: ${m.estimated_wind_kmph} km/h`).openPopup();
 
             const trackPoints = [[lat, lon]];
             data.trajectory_forecast.forEach(pt => {
@@ -375,15 +983,15 @@
                     radius: pt.uncertainty_cone_radius_km * 1000,
                     color: '#22d3ee',
                     fillColor: '#0891b2',
-                    fillOpacity: 0.2,
-                    weight: 1.5
+                    fillOpacity: 0.18,
+                    weight: 1.2
                 }).addTo(map);
                 conePolygons.push(circle);
             });
 
             trackPolyline = L.polyline(trackPoints, {
                 color: '#38bdf8',
-                weight: 3.5,
+                weight: 3,
                 dashArray: '6, 6'
             }).addTo(map);
 
@@ -394,14 +1002,14 @@
             analogContainer.innerHTML = '';
             data.top_historical_analogs.forEach(a => {
                 const div = document.createElement('div');
-                div.className = 'bg-gray-900/60 p-2.5 rounded border border-gray-800 flex justify-between items-center';
+                div.className = 'bg-slate-900/60 p-2 rounded-lg border border-slate-800 flex justify-between items-center';
                 div.innerHTML = `
                     <div>
-                        <div class="font-bold text-gray-200">${a.cyclone_name} (${a.year})</div>
-                        <div class="text-[10px] text-gray-400">Peak: ${a.historical_peak_wind_knots} kts | Landfall: ${a.landfall_location}</div>
+                        <div class="font-bold text-slate-200 text-xs">${a.cyclone_name} (${a.year})</div>
+                        <div class="text-[10px] text-slate-400">Peak: ${a.historical_peak_wind_knots} kts | Landfall: ${a.landfall_location}</div>
                     </div>
                     <div>
-                        <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
                             ${a.similarity_score_pct}% Match
                         </span>
                     </div>
@@ -449,6 +1057,7 @@
         window.onload = () => {
             initMap();
             runAnalysis();
+            loadAuditTrail();
         };
     </script>
 </body>
