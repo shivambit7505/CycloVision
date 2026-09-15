@@ -76,6 +76,12 @@
                 </button>
             </div>
 
+            <button onclick="enableBrowserPushNotifications()" id="btnPushNotification" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-3 py-1.5 rounded shadow transition flex items-center gap-1.5 animate-pulse">
+                <span>🔔</span> <span>Enable Live Alerts</span>
+            </button>
+            <button onclick="sendTestEmergencyBroadcast()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-600/60 text-xs font-semibold px-2.5 py-1.5 rounded shadow transition flex items-center gap-1">
+                <span>📢</span> <span>Test Broadcast</span>
+            </button>
             <span id="alertBadge" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-red-600/30 text-red-400 border border-red-500 animate-pulse">
                 RED ALERT
             </span>
@@ -1048,6 +1054,78 @@
 
         function closeBulletinModal() {
             document.getElementById('bulletinModal').classList.add('hidden');
+        }
+
+        // Web Push Protocol (VAPID) Integration
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function enableBrowserPushNotifications() {
+            const btn = document.getElementById('btnPushNotification');
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                alert("Push Notifications are not supported by this browser.");
+                return;
+            }
+
+            try {
+                btn.innerText = "⏳ Registering...";
+                const reg = await navigator.serviceWorker.register('/static/sw.js');
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    alert("Notification permission was not granted.");
+                    btn.innerText = "🔔 Enable Live Alerts";
+                    return;
+                }
+
+                const keyRes = await fetch('/api/vapid-public-key');
+                const keyData = await keyRes.json();
+                const convertedKey = urlBase64ToUint8Array(keyData.public_key);
+
+                const subscription = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedKey
+                });
+
+                await fetch('/api/subscribe-push', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(subscription)
+                });
+
+                btn.className = "bg-emerald-700 text-emerald-200 text-xs font-semibold px-3 py-1.5 rounded-lg border border-emerald-500 shadow flex items-center gap-1.5";
+                btn.innerHTML = "<span>✅</span> <span>Alerts Active</span>";
+                alert("Device registered! You will now receive automated cyclone emergency warnings directly on your screen.");
+            } catch (err) {
+                console.error("Push registration error:", err);
+                btn.innerText = "🔔 Enable Live Alerts";
+                alert("Push Notification notice: " + (err.message || err));
+            }
+        }
+
+        async function sendTestEmergencyBroadcast() {
+            try {
+                const res = await fetch('/api/trigger-emergency-broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: "🚨 URGENT CYCLONE ALERT | MoES IMD",
+                        body: "Cyclone BOB-02 has intensified to VERY SEVERE. Expected landfall in 18h with 145 km/h winds. Evacuate low-lying zones immediately!",
+                        district: "Visakhapatnam - Puri Sector"
+                    })
+                });
+                const data = await res.json();
+                alert(`Broadcast dispatched! Reached: ${data.recipients_reached} subscriber(s). If you enabled alerts, check your screen!`);
+            } catch (e) {
+                alert("Broadcast error: " + e);
+            }
         }
 
         document.getElementById('intensitySlider').addEventListener('input', (e) => {

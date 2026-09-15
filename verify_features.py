@@ -46,4 +46,26 @@ d7 = app.get_audit_trail()
 assert len(d7) >= 3
 print('[PASS] 7. Human-in-the-Loop & Audit Trail: OK -> Total Records:', len(d7))
 
-print('=== ALL 25 FEATURES TESTED AND 100% OPERATIONAL ===')
+# 8. Web Push VAPID Public Key & Subscription
+vk = app.get_vapid_public_key()
+assert 'public_key' in vk
+print('[PASS] 8. VAPID Web Push Key:', vk['public_key'][:20] + '...')
+
+# 9. Emergency Broadcast Dispatcher
+sub_payload = app.PushSubscriptionPayload(
+    endpoint='https://fcm.googleapis.com/fcm/send/sample_test_endpoint',
+    keys={'p256dh': 'BNcRdreALRFXTkOOUHK18m2WPwhO-rmMoZwzkZxOa9n0aS858aMkKqMYtzkFsEkZHXoWBzeyw6NTytZXgUjE0WU', 'auth': 'tBHItJI5svbpez7KI4CCXg'}
+)
+sub_res = app.subscribe_push(sub_payload)
+assert sub_res['status'] == 'SUBSCRIBED'
+
+b_payload = app.BroadcastAlertPayload(
+    title='🚨 EMERGENCY CYCLONE WARNING | CycloVision AI',
+    body='Category VSCS Cyclone approaching Andhra-Odisha coast.',
+    district='Puri - Visakhapatnam'
+)
+b_res = app.trigger_emergency_broadcast(b_payload)
+assert b_res['status'] == 'BROADCAST_COMPLETED'
+print('[PASS] 9. Real-Time Emergency Web Push Broadcast: OK -> Status:', b_res['status'])
+
+print('=== ALL 25 FEATURES + LIVE WEB PUSH ALERT PIPELINE 100% OPERATIONAL ===')

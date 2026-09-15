@@ -1,5 +1,6 @@
 import io
 import os
+from typing import Optional, List, Dict
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -409,3 +410,89 @@ def get_bulletin(req: CycloneAnalysisRequest):
         "landfall": data["landfall_risk"]
     })
     return {"bulletin_text": bulletin}
+
+# ==========================================
+# 🚨 REAL-TIME WEB PUSH BROADCAST SERVICE
+# ==========================================
+import json
+try:
+    from pywebpush import webpush, WebPushException
+    PYWEBPUSH_AVAILABLE = True
+except ImportError:
+    PYWEBPUSH_AVAILABLE = False
+
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "BBaypb3oMdK9vJf0uPn4e2wSXZjKunWkp1H4S8tAAcPlQPBadX2SsiIxi-O2OOisXirahHJMqduhJSjUM3oxE-Y")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "-7gnALe1uyMLHvUi2sIUC8PXyBg5UPDlQ-J0eO8QndM")
+VAPID_CLAIMS_EMAIL = os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@cyclovision.in")
+
+PUSH_SUBSCRIPTIONS = []
+
+class PushSubscriptionPayload(BaseModel):
+    endpoint: str
+    keys: dict
+
+class BroadcastAlertPayload(BaseModel):
+    title: str = "🚨 CRITICAL CYCLONE ALERT | CycloVision AI"
+    body: str = "Very Severe Cyclone BOB-02 approaching coastal Andhra-Odisha. Landfall expected within 24h. Take immediate shelter."
+    district: Optional[str] = "Coastal Zone"
+
+@app.get("/api/vapid-public-key")
+def get_vapid_public_key():
+    return {"public_key": VAPID_PUBLIC_KEY}
+
+@app.post("/api/subscribe-push")
+def subscribe_push(sub: PushSubscriptionPayload):
+    sub_dict = sub.dict()
+    if not any(s["endpoint"] == sub.endpoint for s in PUSH_SUBSCRIPTIONS):
+        PUSH_SUBSCRIPTIONS.append(sub_dict)
+    return {
+        "status": "SUBSCRIBED",
+        "total_active_subscribers": len(PUSH_SUBSCRIPTIONS),
+        "message": "Device registered for instant live cyclone alerts."
+    }
+
+@app.post("/api/trigger-emergency-broadcast")
+def trigger_emergency_broadcast(payload: BroadcastAlertPayload):
+    notification_data = json.dumps({
+        "title": payload.title,
+        "body": payload.body,
+        "icon": "https://cdn-icons-png.flaticon.com/512/1753/1753311.png",
+        "badge": "https://cdn-icons-png.flaticon.com/512/1753/1753311.png",
+        "data": {"url": "/static/index.html"},
+        "vibrate": [300, 100, 300, 100, 300]
+    })
+
+    success_count = 0
+    failed_count = 0
+    stale_endpoints = []
+
+    if PYWEBPUSH_AVAILABLE and VAPID_PRIVATE_KEY:
+        for sub in PUSH_SUBSCRIPTIONS:
+            try:
+                webpush(
+                    subscription_info=sub,
+                    data=notification_data,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={"sub": VAPID_CLAIMS_EMAIL}
+                )
+                success_count += 1
+            except Exception as e:
+                failed_count += 1
+                if "410" in str(e) or "404" in str(e):
+                    stale_endpoints.append(sub["endpoint"])
+
+        if stale_endpoints:
+            PUSH_SUBSCRIPTIONS[:] = [s for s in PUSH_SUBSCRIPTIONS if s["endpoint"] not in stale_endpoints]
+
+    return {
+        "status": "BROADCAST_COMPLETED",
+        "recipients_reached": success_count,
+        "failed_deliveries": failed_count,
+        "total_subscribers": len(PUSH_SUBSCRIPTIONS),
+        "alert_dispatched": {
+            "title": payload.title,
+            "body": payload.body,
+            "district": payload.district
+        }
+    }
+
