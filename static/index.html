@@ -79,6 +79,7 @@
             <button onclick="enableBrowserPushNotifications()" id="btnPushNotification" class="bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold px-3 py-1.5 rounded shadow transition flex items-center gap-1.5 animate-pulse">
                 <span>🔔</span> <span>Enable Live Alerts</span>
             </button>
+            <button onclick="sendTelegramAlertFromApp()" class="bg-[#229ED9] hover:bg-[#1e8bc0] text-white text-xs font-semibold px-2.5 py-1.5 rounded shadow transition flex items-center gap-1"><span>✈️</span> <span>Telegram Alert</span></button>
             <button onclick="sendTestEmergencyBroadcast()" class="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-600/60 text-xs font-semibold px-2.5 py-1.5 rounded shadow transition flex items-center gap-1">
                 <span>📢</span> <span>Test Broadcast</span>
             </button>
@@ -1052,6 +1053,21 @@
             document.getElementById('bulletinModal').classList.remove('hidden');
         }
 
+        
+        async function sendTelegramAlertFromApp() {
+            try {
+                const res = await fetch('/api/send-telegram-alert', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'SUCCESS') {
+                    alert(🚀 Telegram Alert Dispatched! Delivered to: );
+                } else {
+                    alert("Telegram notice: " + (data.message || data.error));
+                }
+            } catch (e) {
+                alert("Telegram API Error: " + e);
+            }
+        }
+    
         function closeBulletinModal() {
             document.getElementById('bulletinModal').classList.add('hidden');
         }

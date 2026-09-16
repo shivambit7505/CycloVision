@@ -496,3 +496,38 @@ def trigger_emergency_broadcast(payload: BroadcastAlertPayload):
         }
     }
 
+
+@app.post("/api/send-telegram-alert")
+def api_send_telegram_alert():
+    try:
+        import urllib.request, json
+        TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "REDACTED_TELEGRAM_TOKEN")
+        url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
+        req = urllib.request.urlopen(url)
+        data = json.loads(req.read().decode('utf-8'))
+        if not data.get("result"):
+            return {"status": "FAILED", "message": "No subscribers found. Send /start or 'hi' to bot first."}
+        last_msg = data["result"][-1]["message"]
+        chat_id = last_msg["chat"]["id"]
+        user_name = last_msg["chat"].get("first_name", "User")
+        
+        alert_text = (
+            "🚨 *IMD / CYCLOVISION AI EMERGENCY RED ALERT*\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            "🌀 *Active Storm:* CYCLONE-X (BOB-02)\n"
+            "⚠️ *Stage:* Very Severe Cyclonic Storm (VSCS)\n"
+            "💨 *Max Sustained Wind:* 165 km/h (Gusts: 185 km/h)\n"
+            "📍 *Target Landfall:* Visakhapatnam - Puri Coast\n"
+            "🌊 *Storm Surge:* 3.8 Meters Inundation Risk\n"
+            "⏱️ *Impact Window:* Next 18 Hours\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            "🛡️ *Action Required:* Evacuate coastal lowlands immediately. Move to designated concrete shelters.\n"
+            "📞 *State Disaster Helpline:* 1070"
+        )
+        send_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+        payload = json.dumps({"chat_id": chat_id, "text": alert_text, "parse_mode": "Markdown"}).encode('utf-8')
+        req_send = urllib.request.Request(send_url, data=payload, headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(req_send)
+        return {"status": "SUCCESS", "recipient": f"{user_name} ({chat_id})"}
+    except Exception as e:
+        return {"status": "ERROR", "error": str(e)}
