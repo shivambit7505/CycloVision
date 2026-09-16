@@ -1,3 +1,4 @@
+from v2.api.routes import v2_router
 import io
 import os
 from typing import Optional, List, Dict
@@ -531,3 +532,5 @@ def api_send_telegram_alert():
         return {"status": "SUCCESS", "recipient": f"{user_name} ({chat_id})"}
     except Exception as e:
         return {"status": "ERROR", "error": str(e)}
+
+app.include_router(v2_router)

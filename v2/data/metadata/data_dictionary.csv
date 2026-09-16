@@ -1,0 +1,9 @@
+Variable,Source,Units,Resolution,Description
+storm_id,NOAA IBTrACS v4,String,Storm-level,Unique storm identifier
+valid_time,IMD / IBTrACS,UTC ISO-8601,3-hourly,Observation timestamp
+latitude,IMD Best-Track,Degrees North,0.1 deg,Center latitude
+longitude,IMD Best-Track,Degrees East,0.1 deg,Center longitude
+wind_speed,IMD / RSMC,knots & km/h,1 knot,Maximum 3-minute sustained wind
+central_pressure,IMD / RSMC,hPa,1 hPa,Estimated central barometric pressure
+sst,NOAA OISST / ERSST,Celsius,0.25 deg,Sea surface temperature
+vws,MERRA-2 Reanalysis,knots,0.5 deg,850-200 hPa vertical wind shear

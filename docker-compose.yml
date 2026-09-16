@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  cyclovision-ai:
+    build: .
+    container_name: cyclovision_core
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    volumes:
+      - ./v2/db:/app/v2/db

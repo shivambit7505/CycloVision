@@ -1,0 +1,18 @@
+# Source Manifest for CycloVision AI V2 (Slide 15)
+version: '2.1.0'
+date_created: '2026-09-17'
+authoritative_sources:
+  best_track:
+    name: NOAA NCEI IBTrACS v4r01
+    doi: '10.25921/82ty-9e16'
+    regional_authority: IMD RSMC New Delhi
+  satellite:
+    name: ISRO MOSDAC INSAT-3D/3DR/3DS
+    channels: [TIR-1, TIR-2, VIS, WV]
+  environment:
+    reanalysis: NASA MERRA-2
+    sea_surface_temp: NOAA ERSSTv6
+data_leakage_safeguards:
+  group_split: By Storm & Season
+  future_position_leakage: Blocked
+  timestamp_tolerance_max: 30 minutes
