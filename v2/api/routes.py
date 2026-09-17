@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from v2.data.ibtracs_loader import list_available_storms, get_storm_by_id
 from v2.models.cyclovision_v2_engine import estimate_intensity_v2, predict_rapid_intensification, forecast_track_v2
 from v2.gis.landfall import compute_gis_landfall
@@ -13,14 +13,31 @@ def api_v2_storms():
 def api_v2_storm_state(storm_id: str):
     storm = get_storm_by_id(storm_id)
     if not storm:
-        return {"error": "Storm not found"}
+        raise HTTPException(status_code=404, detail=f"Storm with ID '{storm_id}' not found.")
     
-    # Run V2 Pipeline on selected storm
     last_obs = storm["observations"][-1]
-    intensity = estimate_intensity_v2(t_number=5.5)
-    ri = predict_rapid_intensification(current_wind_kts=last_obs["wind_kts"], sst=29.8, vws=7.5, rh_mid=78.0)
+    obs_wind = float(last_obs.get("wind_kts", 65.0))
+
+    
+    # Dynamically invert Dvorak Atkinson-Holliday wind: T = (wind_kts / 23.0) ** (1 / 0.95)
+    dynamic_t_number = round(max(1.5, min(8.0, (obs_wind / 23.0) ** (1.0 / 0.95))), 1)
+    
+    # Regional thermodynamic context by basin
+    basin = storm.get("basin", "Bay of Bengal")
+    if basin == "Bay of Bengal":
+        sst = 30.2
+        vws = 7.5
+        rh_mid = 82.0
+    else:  # Arabian Sea
+        sst = 29.4
+        vws = 11.2
+        rh_mid = 74.0
+
+    # Run dynamic models with storm parameters
+    intensity = estimate_intensity_v2(t_number=dynamic_t_number, sst=sst, vws=vws)
+    ri = predict_rapid_intensification(current_wind_kts=obs_wind, sst=sst, vws=vws, rh_mid=rh_mid)
     track = forecast_track_v2(cur_lat=last_obs["lat"], cur_lon=last_obs["lon"])
-    landfall = compute_gis_landfall(track)
+    landfall = compute_gis_landfall(track, current_coords={"lat": last_obs["lat"], "lon": last_obs["lon"]})
     
     return {
         "metadata": storm,

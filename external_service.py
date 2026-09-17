@@ -1,4 +1,4 @@
-﻿"""
+"""
 CycloVision AI - External Intelligence & API Integration Service
 Handles:
 1. Gemini / LLM Reasoning for Meteorological Explanations & Bulletins

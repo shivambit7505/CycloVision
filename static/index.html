@@ -64,7 +64,7 @@
             <!-- Language Voice Alert (Feature 24) -->
             <div class="flex items-center bg-slate-900 border border-slate-700/70 rounded-lg px-2 py-1 gap-1.5">
                 <span class="text-xs">🗣️</span>
-                <select id="langSelect" class="bg-transparent text-xs text-cyan-300 focus:outline-none cursor-pointer">
+                <select id="langSelect" aria-label="Select Voice Alert Language" class="bg-transparent text-xs text-cyan-300 focus:outline-none cursor-pointer">
                     <option value="en" class="bg-slate-900">English</option>
                     <option value="hi" class="bg-slate-900">हिन्दी (Hindi)</option>
                     <option value="bn" class="bg-slate-900">বাংলা (Bengali)</option>
@@ -196,7 +196,7 @@
                         <div class="space-y-2.5 text-xs">
                             <div>
                                 <label class="text-slate-400 block mb-1">Ocean Basin</label>
-                                <select id="basinSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200">
+                                <select id="basinSelect" aria-label="Select Ocean Basin" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-slate-200">
                                     <option value="Bay of Bengal">Bay of Bengal (BoB)</option>
                                     <option value="Arabian Sea">Arabian Sea (AS)</option>
                                 </select>
@@ -273,7 +273,7 @@
 
                             <div class="flex items-center gap-2 text-xs">
                                 <label class="text-slate-400">Layer:</label>
-                                <select id="mapLayerSelect" onchange="switchMapLayer()" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-cyan-400 text-xs">
+                                <select id="mapLayerSelect" aria-label="Select Map Layer Mode" onchange="switchMapLayer()" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-cyan-400 text-xs">
                                     <option value="satellite">High-Res Satellite View</option>
                                     <option value="dark">Dark Meteorological Grid</option>
                                 </select>
@@ -408,7 +408,7 @@
                         <h3 class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
                             <span>🔄</span> Historical Cyclone Replay
                         </h3>
-                        <select id="selectReplayEvent" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" onchange="loadHistoricalEvent()">
+                        <select id="selectReplayEvent" aria-label="Select Historical Replay Cyclone Event" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white" onchange="loadHistoricalEvent()">
                             <option value="fani_2019">Cyclone FANI (2019) — Puri Landfall</option>
                             <option value="amphan_2020">Super Cyclone AMPHAN (2020)</option>
                             <option value="biparjoy_2023">Cyclone BIPARJOY (2023) — Gujarat</option>
@@ -842,31 +842,55 @@
             }
         }
 
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         async function loadAuditTrail() {
+            const container = document.getElementById('auditTrailList');
             try {
                 const res = await fetch('/api/audit-trail');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const list = await res.json();
-                const container = document.getElementById('auditTrailList');
                 if (container) {
                     container.innerHTML = '';
+                    if (!list || list.length === 0) {
+                        container.innerHTML = '<div class="text-[11px] text-slate-500 italic p-2">No audit records yet.</div>';
+                        return;
+                    }
                     list.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'p-2.5 rounded-lg bg-slate-900/60 border border-slate-800';
+                        const decision = escapeHTML(item.decision || item.status || 'RECORDED');
+                        const auditId = escapeHTML(item.audit_id || item.id || 'AUD');
+                        const ts = escapeHTML(item.timestamp || 'Recent');
+                        const notes = escapeHTML(item.forecaster_notes || 'No notes provided.');
+                        const colorClass = decision === 'APPROVED' ? 'text-emerald-400' : (decision === 'FLAGGED' || decision === 'REJECTED') ? 'text-rose-400' : 'text-amber-400';
+                        
                         div.innerHTML = `
                             <div class="flex justify-between text-slate-400 text-[10px]">
-                                <span>${item.timestamp} • ${item.id}</span>
-                                <span class="${item.status === 'APPROVED' ? 'text-emerald-400' : item.status === 'FLAGGED' ? 'text-rose-400' : 'text-amber-400'} font-bold">${item.status}</span>
+                                <span>${ts} • ${auditId}</span>
+                                <span class="${colorClass} font-bold">${decision}</span>
                             </div>
-                            <div class="font-bold text-white mt-1">${item.intensity_kmph} km/h • Track ${item.track_heading}</div>
-                            <div class="text-[10px] text-slate-500 mt-0.5">${item.forecaster_notes}</div>
+                            <div class="text-[11px] text-slate-300 mt-1">${notes}</div>
                         `;
                         container.appendChild(div);
                     });
                 }
             } catch (e) {
-                console.error(e);
+                console.error("Audit trail fetch error:", e);
+                if (container) {
+                    container.innerHTML = '<div class="text-[10px] text-rose-400 p-2">⚠️ Unable to load audit trail ledger.</div>';
+                }
             }
         }
+
 
         async function runAnalysis() {
             const basin = document.getElementById('basinSelect').value;
@@ -896,7 +920,7 @@
 
         async function uploadSatelliteImage() {
             const fileInput = document.getElementById('imageInput');
-            if (!fileInput.files || fileInput.files.length === 0) {
+            if (!fileInput?.files?.length) {
                 alert("Please select a satellite image to upload first!");
                 return;
             }
@@ -1059,7 +1083,7 @@
                 const res = await fetch('/api/send-telegram-alert', { method: 'POST' });
                 const data = await res.json();
                 if (data.status === 'SUCCESS') {
-                    alert(🚀 Telegram Alert Dispatched! Delivered to: );
+                    alert(`🚀 Telegram Alert Dispatched! Delivered to: ${data.delivered_to || 'Subscribers'}`);
                 } else {
                     alert("Telegram notice: " + (data.message || data.error));
                 }

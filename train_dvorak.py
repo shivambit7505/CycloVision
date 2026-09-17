@@ -1,4 +1,4 @@
-﻿"""
+"""
 CycloVision AI - Model Training Pipeline
 Trains Deep CNN on Multi-Spectral Satellite Arrays with Data Augmentation
 Saves trained weights to cyclovision_weights.pth

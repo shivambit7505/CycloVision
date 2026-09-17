@@ -1,4 +1,4 @@
-﻿import json
+import json
 import urllib.request
 import urllib.parse
 import base64

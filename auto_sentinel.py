@@ -1,54 +1,258 @@
-import time, json, urllib.request, os, subprocess
+import time
+import json
+import urllib.request
+import urllib.parse
+import base64
+import os
+import subprocess
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "REDACTED_TELEGRAM_TOKEN")
-LAST_ALERT_TIME = None
-COOLDOWN_SECONDS = 300  # 5-Minute Anti-Spam Cooldown (Slide 30)
+# Configuration & Credentials loaded strictly from environment
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TWILIO_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "+14155238886")
+WHATSAPP_NUMBERS = [n.strip() for n in os.getenv("WHATSAPP_ALERT_NUMBERS", "").split(",") if n.strip()]
+DEFAULT_ALERT_EMAIL = os.getenv("ALERT_RECIPIENT_EMAIL", os.getenv("GMAIL_USER", "advisory@cyclovision.in"))
 
-def dispatch_sentinel_alert(storm_name, wind_kmph, stage, landfall_time):
-    global LAST_ALERT_TIME
-    now = datetime.now()
-    
-    # Check Hysteresis/Cooldown (Slide 30)
-    if LAST_ALERT_TIME and (now - LAST_ALERT_TIME).total_seconds() < COOLDOWN_SECONDS:
-        print(f"[{now.strftime('%H:%M:%S')}] ⏳ Alert suppressed by anti-spam cooldown window.")
-        return
-        
+CHAT_ID_FILE = os.path.join("v2", "data", "telegram_chat_id.txt")
+LAST_ALERT_TIME = None
+COOLDOWN_SECONDS = 60  # Responsive 1-minute cooldown window
+
+import re
+
+def save_persisted_chat_id(chat_id: str) -> bool:
+    """Saves user's Telegram Chat ID with strict numeric validation."""
+    clean_id = str(chat_id).strip()
+    if not re.match(r'^-?\d{6,16}$', clean_id):
+        print(f"  [ERROR] Invalid Telegram Chat ID rejected: {clean_id[:20]}")
+        return False
+    try:
+        os.makedirs(os.path.dirname(CHAT_ID_FILE), exist_ok=True)
+        with open(CHAT_ID_FILE, "w", encoding="utf-8") as f:
+            f.write(clean_id)
+        return True
+    except Exception as e:
+        print(f"Error saving chat_id: {e}")
+        return False
+
+def get_persisted_chat_id():
+    # 1. Try reading from cache file
+    if os.path.exists(CHAT_ID_FILE):
+        try:
+            with open(CHAT_ID_FILE, "r", encoding="utf-8") as f:
+                cid = f.read().strip()
+                if cid:
+                    return cid
+        except Exception:
+            pass
+
+    # 2. Try fetching from Telegram getUpdates and cache it
     try:
         url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
         req = urllib.request.urlopen(url)
-        data = json.loads(req.read().decode('utf-8'))
+        data = json.loads(req.read().decode("utf-8"))
         if data.get("result"):
-            chat_id = data["result"][-1]["message"]["chat"]["id"]
-            msg = (
-                f"🚨 *[CYCLOVISION V2 AUTONOMOUS SENTINEL]*\n"
-                f"━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🌀 *Storm:* {storm_name}\n"
-                f"⚠️ *Stage:* {stage}\n"
-                f"💨 *Wind:* {wind_kmph} km/h\n"
-                f"⏱️ *Landfall:* {landfall_time}\n"
-                f"📍 *Sector:* Visakhapatnam - Puri Coast\n"
-                f"━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🛡️ *Status:* Validated Multi-Channel Trigger"
-            )
-            send_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-            payload = json.dumps({"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}).encode('utf-8')
-            urllib.request.urlopen(urllib.request.Request(send_url, data=payload, headers={'Content-Type': 'application/json'}))
-            LAST_ALERT_TIME = now
-            print(f"[{now.strftime('%H:%M:%S')}] 📱 TELEGRAM NOTIFICATION DELIVERED!")
-    except Exception as e:
-        print("Telegram error:", e)
+            cid = str(data["result"][-1]["message"]["chat"]["id"])
+            os.makedirs(os.path.dirname(CHAT_ID_FILE), exist_ok=True)
+            with open(CHAT_ID_FILE, "w", encoding="utf-8") as f:
+                f.write(cid)
+            return cid
+    except Exception:
+        pass
+    return None
 
-    # Laptop Audio Siren
+def dispatch_telegram_alert(storm_name="CYCLONE-X", wind_kmph=165.0, stage="Very Severe Cyclonic Storm (VSCS)", landfall_time="Within 18 Hours"):
+    if not TOKEN:
+        print("  [NOTICE] Telegram notice: TELEGRAM_BOT_TOKEN not configured in .env")
+        return {"status": "NOT_CONFIGURED", "message": "Set TELEGRAM_BOT_TOKEN in .env"}
+
+    chat_id = get_persisted_chat_id()
+    if not chat_id:
+        print("  [NOTICE] Telegram notice: No chat_id found yet. Please send /start or 'Hi' to your Telegram alert bot once!")
+        return {"status": "WAITING_FOR_USER_START"}
+
+    msg = (
+        f"🚨 *[CYCLOVISION V2 AUTONOMOUS RED ALERT]*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌀 *Storm:* {storm_name}\n"
+        f"⚠️ *Stage:* {stage}\n"
+        f"💨 *Max Sustained Wind:* {wind_kmph} km/h\n"
+        f"⏱️ *Estimated Landfall:* {landfall_time}\n"
+        f"📍 *High-Risk Sector:* Visakhapatnam - Puri Coast\n"
+        f"🌊 *Storm Surge:* 3.8m Inundation Threat\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🛡️ *Action Required:* Move immediately to designated cyclone shelters. Total deep-sea fishing ban.\n"
+        f"📞 *Disaster Helpline:* 1070"
+    )
+    send_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    payload = json.dumps({"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}).encode("utf-8")
+    try:
+        req = urllib.request.Request(send_url, data=payload, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=10)
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] [TELEGRAM] ALERT DELIVERED! (Chat ID: {chat_id})")
+        return {"status": "DELIVERED", "chat_id": chat_id}
+    except Exception as e:
+        print("  [ERROR] Telegram error:", e)
+        return {"status": "FAILED", "error": str(e)}
+
+def dispatch_whatsapp_alerts(storm_name="CYCLONE-X", wind_kmph=165.0):
+    if not TWILIO_SID or not TWILIO_TOKEN or not WHATSAPP_NUMBERS:
+        print("  [NOTICE] Twilio notice: Twilio credentials or WHATSAPP_ALERT_NUMBERS not configured in .env")
+        return {"status": "NOT_CONFIGURED", "message": "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and WHATSAPP_ALERT_NUMBERS in .env"}
+
+    twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
+    credentials = f"{TWILIO_SID}:{TWILIO_TOKEN}"
+    base64_auth = base64.b64encode(credentials.encode("ascii")).decode("ascii")
+    
+    body_text = (
+        f"🚨 *MoES NDMA CYCLONE RED ALERT*\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"Severe Cyclone *{storm_name}* approaching with winds of *{wind_kmph} km/h*.\n"
+        f"Sector: *Visakhapatnam - Puri Coast*.\n"
+        f"Surge Hazard: *3.8m Inundation*.\n"
+        f"Advisory: Evacuate lowlands immediately to concrete shelters.\n"
+        f"State Helpline: *1070*"
+    )
+    
+    results = {}
+    for num in WHATSAPP_NUMBERS:
+        try:
+            data = urllib.parse.urlencode({
+                "From": f"whatsapp:{TWILIO_FROM}",
+                "To": f"whatsapp:{num}",
+                "Body": body_text
+            }).encode("utf-8")
+            
+            req = urllib.request.Request(twilio_url, data=data)
+            req.add_header("Authorization", f"Basic {base64_auth}")
+            
+            with urllib.request.urlopen(req) as resp:
+                res_data = json.loads(resp.read().decode("utf-8"))
+                sid = res_data.get("sid", "")[:12]
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [WHATSAPP] SUCCESS to {num}! (SID: {sid}...)")
+                results[num] = {"status": "SENT", "sid": sid}
+        except urllib.error.HTTPError as he:
+            err_msg = he.read().decode("utf-8")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [NOTICE] Twilio response for {num}: {err_msg[:75]}...")
+            results[num] = {"status": "NOTICE", "response": err_msg[:75]}
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [ERROR] WhatsApp error for {num}: {e}")
+            results[num] = {"status": "ERROR", "error": str(e)}
+    return results
+
+def dispatch_email_alert(storm_name="CYCLONE-X", wind_kmph=165.0, stage="Very Severe Cyclonic Storm (VSCS)", target_email=None):
+    target_email = target_email or DEFAULT_ALERT_EMAIL
+    subject = f"🚨 URGENT CYCLONE RED ALERT: {storm_name} ({stage})"
+    body = (
+        f"CYCLOVISION AI V2 — NATIONAL DECISION SUPPORT PLATFORM\n"
+        f"===============================================================\n"
+        f"Official Emergency Advisory issued by MoES / IMD Early Warning System\n\n"
+        f"Storm Name: {storm_name}\n"
+        f"Current Intensity Stage: {stage}\n"
+        f"Maximum Sustained Surface Wind: {wind_kmph} km/h (Gusts to {round(wind_kmph*1.15, 1)} km/h)\n"
+        f"Target Landfall Sector: Visakhapatnam - Puri Coast\n"
+        f"Inundation Hazard: 3.5m - 4.2m Storm Surge Threat\n\n"
+        f"Recommended Action:\n"
+        f"- Move coastal population to multi-purpose cyclone shelters.\n"
+        f"- Total suspension of fishing and marine operations.\n"
+        f"- State Emergency Operations Centre (SEOC) Helpline: 1070\n\n"
+        f"Data Provenance: ISRO MOSDAC INSAT-3D/3DS + NOAA IBTrACS v4 (DOI: 10.25921/82ty-9e16)\n"
+        f"===============================================================\n"
+    )
+    
+    email_path = os.path.join("v2", "data", "latest_email_alert.txt")
+    os.makedirs(os.path.dirname(email_path), exist_ok=True)
+    with open(email_path, "w", encoding="utf-8") as f:
+        f.write(f"To: {target_email}\nSubject: {subject}\n\n{body}")
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] [EMAIL] BULLETIN PREPARED & LOGGED to {email_path}!")
+
+    smtp_user = os.getenv("GMAIL_USER")
+    smtp_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart()
+            msg["From"] = smtp_user
+            msg["To"] = target_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body, "plain"))
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+                server.login(smtp_user, smtp_pass)
+                server.send_message(msg)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] [EMAIL] DIRECTLY DISPATCHED via Gmail SMTP to {target_email}!")
+            return {"status": "DISPATCHED_SMTP", "recipient": target_email}
+        except Exception as e:
+            print(f"  [NOTICE] SMTP notice: {e}")
+    return {"status": "PREPARED_AND_LOGGED", "file": email_path, "recipient": target_email}
+
+def play_audio_siren(storm_name="CYCLONE-X", wind_kmph=165.0):
     try:
         import winsound
         winsound.Beep(1400, 300)
-        cmd = 'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'Cyclone Red Alert Detected. Evacuate coastal lowlands immediately.\')"'
-        subprocess.Popen(cmd, shell=True)
-        print(f"[{now.strftime('%H:%M:%S')}] 🔊 LAPTOP SPEAKER SIREN & VOICE BROADCAST ACTIVATED!")
-    except Exception:
-        pass
+        winsound.Beep(1800, 450)
+        # Sanitize parameters strictly to eliminate command injection
+        safe_name = re.sub(r'[^a-zA-Z0-9\s\-()]', '', str(storm_name)).strip() or "CYCLONE"
+        safe_wind = round(float(wind_kmph), 1)
+        spoken_text = f"Warning! CycloVision AI detected {safe_name} with wind speed of {safe_wind} kilometers per hour. Emergency red alert active."
+        
+        ps_cmd = [
+            "powershell",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$txt = [Console]::In.ReadLine(); Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak($txt)"
+        ]
+        proc = subprocess.Popen(ps_cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            proc.communicate(input=spoken_text + "\n", timeout=4)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] [AUDIO] LAPTOP SPEAKER SIREN & VOICE BROADCAST PLAYED!")
+        return {"status": "DISPATCHED", "sanitized_storm": safe_name, "spoken_text": spoken_text}
+    except Exception as e:
+        print(f"  [NOTICE] Audio siren notice: {e}")
+        return {"status": "ERROR", "error": str(e)}
+
+def run_sentinel_sweep(storm_name="CYCLONE-X (BOB-02)", wind_kmph=165.0, stage="Very Severe Cyclonic Storm (VSCS)", force=False):
+    global LAST_ALERT_TIME
+    now = datetime.now()
+    if not force and LAST_ALERT_TIME and (now - LAST_ALERT_TIME).total_seconds() < COOLDOWN_SECONDS:
+        print(f"[{now.strftime('%H:%M:%S')}] [COOLDOWN] Alert suppressed by anti-spam cooldown window.")
+        return {"status": "COOLDOWN_ACTIVE"}
+
+    print("=" * 70)
+    print("CYCLOVISION AI - MULTI-CHANNEL DISASTER SENTINEL ACTIVE")
+    print(f"Sweep Timestamp: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print("=" * 70)
+
+    # 1. Telegram
+    t_res = dispatch_telegram_alert(storm_name, wind_kmph, stage, "Within 18 Hours")
+    
+    # 2. WhatsApp
+    w_res = dispatch_whatsapp_alerts(storm_name, wind_kmph)
+    
+    # 3. Email
+    e_res = dispatch_email_alert(storm_name, wind_kmph, stage)
+    
+    # 4. Audio Siren
+    play_audio_siren(storm_name, wind_kmph)
+    
+    LAST_ALERT_TIME = now
+    return {
+        "status": "SENTINEL_SWEEP_COMPLETED",
+        "telegram": t_res,
+        "whatsapp": w_res,
+        "email": e_res
+    }
+
+def dispatch_sentinel_alert(storm_name="CYCLONE-X (BOB-02)", wind_kmph=165.0, stage="Very Severe Cyclonic Storm (VSCS)", landfall_time="Within 18h"):
+    """Backwards-compatible sentinel dispatcher for app.py and legacy callers."""
+    return run_sentinel_sweep(storm_name=storm_name, wind_kmph=wind_kmph, stage=stage, force=True)
 
 if __name__ == "__main__":
-    print("🌀 CycloVision V2 Sentinel Running Single Verification Sweep...")
-    dispatch_sentinel_alert("CYCLONE-X (BOB-02)", 165.0, "Very Severe Cyclonic Storm (VSCS)", "Within 18h")
+    run_sentinel_sweep(force=True)
+

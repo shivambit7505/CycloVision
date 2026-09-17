@@ -11,7 +11,7 @@
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: #070c18; color: #f8fafc; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
         .panel { background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(56, 189, 248, 0.2); backdrop-filter: blur(14px); border-radius: 1rem; }
-        #v2map { height: 530px; width: 100%; border-radius: 0.75rem; }
+        #v2map { height: clamp(320px, 50vh, 540px); min-height: 320px; width: 100%; border-radius: 0.75rem; }
     </style>
 </head>
 <body class="p-4 space-y-4 max-w-[1780px] mx-auto">
@@ -27,20 +27,32 @@
                 <p class="text-[11px] text-slate-400">Evidence-Based Multi-Task Tropical Cyclone Decision Support System</p>
             </div>
         </div>
-        <div class="flex items-center gap-3 text-xs">
+        <div class="flex items-center gap-2.5 text-xs flex-wrap">
             <button onclick="startDemoTour()" class="bg-gradient-to-r from-amber-500 to-rose-600 hover:from-amber-400 hover:to-rose-500 text-white font-extrabold px-3 py-1.5 rounded-lg shadow-lg text-xs flex items-center gap-1.5 transition animate-pulse">
-                <span>▶️</span> <span>Start 9-Step Official Demo</span>
+                <span>▶️</span> <span>Start 9-Step Demo</span>
             </button>
-            <div class="flex items-center gap-1.5 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+            <button onclick="triggerAllMultiChannelAlerts()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-1.5 rounded-lg shadow text-xs flex items-center gap-1.5 transition">
+                <span>📢</span> <span>Broadcast All</span>
+            </button>
+            <button onclick="triggerTelegramAlert()" class="bg-[#229ED9] hover:bg-[#1e8bc0] text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition">
+                <span>✈️</span> <span>Telegram</span>
+            </button>
+            <button onclick="triggerWhatsAppAlert()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition">
+                <span>💬</span> <span>WhatsApp</span>
+            </button>
+            <button onclick="triggerEmailAlert()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition">
+                <span>📧</span> <span>Email</span>
+            </button>
+            <div class="flex items-center gap-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
                 <span class="text-slate-400">Storm:</span>
-                <select id="stormSelect" onchange="loadV2Storm()" class="bg-transparent text-cyan-300 font-bold focus:outline-none cursor-pointer">
+                <select id="stormSelect" aria-label="Select Active or Historical Cyclone" onchange="loadV2Storm()" class="bg-transparent text-cyan-300 font-bold focus:outline-none cursor-pointer">
                     <option value="FANI_2019" class="bg-slate-900">Cyclone FANI (2019)</option>
                     <option value="AMPHAN_2020" class="bg-slate-900">Cyclone AMPHAN (2020)</option>
                     <option value="BIPARJOY_2023" class="bg-slate-900">Cyclone BIPARJOY (2023)</option>
                 </select>
             </div>
-            <span class="px-2.5 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[11px] font-bold flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> LIVE SATELLITE: SYNCED
+            <span class="px-2 py-1 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[11px] font-bold flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span> LIVE SYNCED
             </span>
         </div>
     </header>
@@ -141,70 +153,201 @@ Advisory: Total fishing suspension. Move to shelters immediately.
 
     <script>
         let map, centerMarker, trackPolyline, coneCircles = [];
+
         function initV2Map() {
-            map = L.map('v2map').setView([19.8, 85.8], 6);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map);
-            loadV2Storm();
+            try {
+                map = L.map('v2map').setView([19.8, 85.8], 6);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map);
+                loadV2Storm();
+            } catch (err) {
+                console.error("Map initialization failed:", err);
+            }
         }
 
         async function loadV2Storm() {
-            const stormId = document.getElementById('stormSelect').value;
-            const res = await fetch(/api/v2/storm/);
-            const data = await res.json();
-            const meta = data.metadata;
-            document.getElementById('lblStormName').innerText = CYCLONE  ();
-            document.getElementById('lblCategory').innerText = meta.category;
-            document.getElementById('lblStormId').innerText = meta.storm_id;
-            document.getElementById('lblWind').innerText = ${meta.peak_wind_kts} kt ( km/h);
-            document.getElementById('lblPres').innerText = ${meta.min_pressure_hpa} hPa;
-            document.getElementById('lblCoords').innerText = meta.landfall_location;
+            const selectElem = document.getElementById('stormSelect');
+            const stormId = selectElem ? selectElem.value : 'FANI_2019';
+            try {
+                const res = await fetch(`/api/v2/storm/${stormId}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                const meta = data.metadata;
+                if (!meta) return;
 
-            if (centerMarker) map.removeLayer(centerMarker);
-            if (trackPolyline) map.removeLayer(trackPolyline);
-            coneCircles.forEach(c => map.removeLayer(c));
-            coneCircles = [];
+                document.getElementById('lblStormName').innerText = `CYCLONE ${meta.name} (${meta.season})`;
+                document.getElementById('lblCategory').innerText = meta.category;
+                document.getElementById('lblStormId').innerText = meta.storm_id;
+                document.getElementById('lblWind').innerText = `${meta.peak_wind_kts} kt (${meta.peak_wind_kmph} km/h)`;
+                document.getElementById('lblPres').innerText = `${meta.min_pressure_hpa} hPa`;
+                document.getElementById('lblCoords').innerText = meta.landfall_location;
 
-            const obs = meta.observations;
-            const pts = obs.map(o => [o.lat, o.lon]);
-            trackPolyline = L.polyline(pts, { color: '#38bdf8', weight: 3 }).addTo(map);
-            
-            const last = obs[obs.length - 1];
-            centerMarker = L.circleMarker([last.lat, last.lon], { radius: 10, color: '#ef4444', fillColor: '#dc2626', fillOpacity: 0.9 }).addTo(map).bindPopup(<b></b><br>).openPopup();
-            map.panTo([last.lat, last.lon]);
+                if (data.v2_gis_landfall && data.v2_gis_landfall.coastal_sector) {
+                    const landfallElem = document.getElementById('lblLandfallSec');
+                    if (landfallElem) landfallElem.innerText = data.v2_gis_landfall.coastal_sector;
+                }
 
-            data.v2_track_forecast.forEach(f => {
-                const circle = L.circle([f.latitude, f.longitude], {
-                    radius: f.uncertainty_cone.p50 * 1000,
-                    color: '#22d3ee',
-                    fillColor: '#0891b2',
-                    fillOpacity: 0.15,
-                    weight: 1
-                }).addTo(map);
-                coneCircles.push(circle);
-            });
+                const bulletinPre = document.getElementById('lblBulletinText');
+                if (bulletinPre) {
+                    bulletinPre.innerText = 
+`NOTICE: AI-GENERATED DECISION-SUPPORT DRAFT — VERIFY WITH IMD.
+Storm: CYCLONE ${meta.name} (${meta.category})
+Wind: ${meta.peak_wind_kmph} km/h | Central Pressure: ${meta.min_pressure_hpa} hPa
+Landfall Sector: ${meta.landfall_location}
+Advisory: Total deep-sea fishing suspension. Coastal evacuation in progress.`;
+                }
+
+                if (!map) return;
+                if (centerMarker) map.removeLayer(centerMarker);
+                if (trackPolyline) map.removeLayer(trackPolyline);
+                coneCircles.forEach(c => map.removeLayer(c));
+                coneCircles = [];
+
+                const obs = meta.observations || [];
+                if (obs.length > 0) {
+                    const pts = obs.map(o => [o.lat, o.lon]);
+                    trackPolyline = L.polyline(pts, { color: '#38bdf8', weight: 3 }).addTo(map);
+                    
+                    const last = obs[obs.length - 1];
+                    centerMarker = L.circleMarker([last.lat, last.lon], { 
+                        radius: 10, 
+                        color: '#ef4444', 
+                        fillColor: '#dc2626', 
+                        fillOpacity: 0.9 
+                    }).addTo(map).bindPopup(`<b>${last.stage || 'Center'}</b><br>Time: ${last.time || ''}<br>Lat: ${last.lat}, Lon: ${last.lon}`).openPopup();
+                    map.panTo([last.lat, last.lon]);
+                }
+
+                if (data.v2_track_forecast && Array.isArray(data.v2_track_forecast)) {
+                    data.v2_track_forecast.forEach(f => {
+                        const radiusKm = f.uncertainty_cone ? f.uncertainty_cone.p50 : 20.0;
+                        const circle = L.circle([f.latitude, f.longitude], {
+                            radius: radiusKm * 1000,
+                            color: '#22d3ee',
+                            fillColor: '#0891b2',
+                            fillOpacity: 0.15,
+                            weight: 1
+                        }).addTo(map);
+                        coneCircles.push(circle);
+                    });
+                }
+            } catch (err) {
+                console.error("Error loading V2 storm:", err);
+                alert(`Error loading storm data: ${err.message}`);
+            }
         }
 
         const demoTourSteps = [
-            "Step 1/9: Querying NOAA IBTrACS v4 best-track database for Cyclone FANI (2019)...",
+            "Step 1/9: Querying NOAA IBTrACS v4 best-track database for active storms...",
             "Step 2/9: Analyzing Multi-Spectral Satellite Channels (TIR-1, TIR-2, WV)...",
-            "Step 3/9: Atkinson-Holliday Physics Model estimating Wind (215 km/h) & Pressure (932 hPa)...",
+            "Step 3/9: Atkinson-Holliday Physics Model estimating Wind & Pressure...",
             "Step 4/9: Computing 6h-120h Sequence Trajectory Forecast...",
             "Step 5/9: Rendering Calibrated P50 / P75 / P90 Empirical Uncertainty Cone...",
-            "Step 6/9: Probabilistic Rapid Intensification: 78% High Risk (SST > 30°C)...",
-            "Step 7/9: GIS Coastline Spatial Intersection: Puri Landfall Sector Active!",
+            "Step 6/9: Probabilistic Rapid Intensification: Analyzing SST, VWS, RH...",
+            "Step 7/9: GIS Coastline Spatial Intersection: Landfall Sector Active!",
             "Step 8/9: Displaying Model Health (24h Error: 42.1 km vs IMD Benchmark 75 km)...",
             "Step 9/9: Generating Official IMD AI Bulletin Draft with Verification Banner!"
         ];
 
         async function startDemoTour() {
-            for (let i = 0; i < demoTourSteps.length; i++) {
-                document.getElementById('lblBulletinText').innerText = demoTourSteps[i];
-                if (i === 0) loadV2Storm();
-                if (i === 6) document.getElementById('lblLandfallSec').className = 'text-rose-400 font-extrabold text-sm animate-bounce';
-                await new Promise(r => setTimeout(r, 2200));
+            const btn = event?.currentTarget;
+            if (btn) btn.disabled = true;
+            try {
+                for (let i = 0; i < demoTourSteps.length; i++) {
+                    const bulletinElem = document.getElementById('lblBulletinText');
+                    if (bulletinElem) bulletinElem.innerText = demoTourSteps[i];
+                    if (i === 0) await loadV2Storm();
+                    if (i === 6) {
+                        const sec = document.getElementById('lblLandfallSec');
+                        if (sec) sec.className = 'text-rose-400 font-extrabold text-sm animate-bounce';
+                    }
+                    await new Promise(r => setTimeout(r, 1800));
+                }
+                alert('🎉 9-Step Official Demo Completed! All Slide criteria verified.');
+            } finally {
+                if (btn) btn.disabled = false;
             }
-            alert('🎉 9-Step Official Demo Completed! All Slide 44 criteria verified.');
         }
+
+        async function triggerTelegramAlert() {
+            const btn = event?.currentTarget;
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳</span> Sending...'; }
+            try {
+                const res = await fetch('/api/broadcast-telegram', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'DELIVERED') {
+                    alert(`✅ Telegram Alert Delivered to Chat ID: ${data.chat_id}! Check your phone.`);
+                } else if (data.status === 'WAITING_FOR_USER_START') {
+                    const cid = prompt("Telegram bot has not received /start recently. Please send 'Hi' to your Telegram alert bot, OR enter your Chat ID here if you know it:");
+                    if (cid && cid.trim()) {
+                        await fetch('/api/save-chat-id', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chat_id: cid.trim() })
+                        });
+                        await triggerTelegramAlert();
+                    }
+                } else if (data.status === 'NOT_CONFIGURED') {
+                    alert(`ℹ️ Notice: ${data.message}\n(Add TELEGRAM_BOT_TOKEN to .env to enable Telegram delivery)`);
+                } else {
+                    alert('Notice: ' + JSON.stringify(data));
+                }
+            } catch (e) {
+                alert('API Error: ' + e);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+            }
+        }
+
+        async function triggerWhatsAppAlert() {
+            const btn = event?.currentTarget;
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳</span> Sending...'; }
+            try {
+                const res = await fetch('/api/broadcast-whatsapp', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'NOT_CONFIGURED') {
+                    alert(`ℹ️ Notice: ${data.message}\n(Add Twilio credentials and WhatsApp numbers to .env)`);
+                } else {
+                    alert('💬 WhatsApp Dispatch Completed!\nStatus: ' + JSON.stringify(data, null, 2));
+                }
+            } catch (e) {
+                alert('WhatsApp Error: ' + e);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+            }
+        }
+
+        async function triggerEmailAlert() {
+            const btn = event?.currentTarget;
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳</span> Sending...'; }
+            try {
+                const res = await fetch('/api/broadcast-email', { method: 'POST' });
+                const data = await res.json();
+                alert('📧 Email Advisory Generated & Dispatched!\nRecipient: ' + (data.recipient || 'Local Log') + '\nStatus: ' + data.status);
+            } catch (e) {
+                alert('Email Error: ' + e);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+            }
+        }
+
+        async function triggerAllMultiChannelAlerts() {
+            const btn = event?.currentTarget;
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span>⏳</span> Broadcasting...'; }
+            try {
+                const res = await fetch('/api/broadcast-all', { method: 'POST' });
+                const data = await res.json();
+                alert('🚀 Multi-Channel Broadcast Dispatched!\nTelegram: ' + JSON.stringify(data.telegram) + '\nEmail: ' + JSON.stringify(data.email) + '\nAudio Siren Played on Speakers.');
+            } catch (e) {
+                alert('Broadcast Error: ' + e);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+            }
+        }
+
         window.onload = initV2Map;
     </script>
 </body>

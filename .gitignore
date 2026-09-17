@@ -15,6 +15,10 @@ env/
 # Temporary logs & database artifacts
 *.log
 *.sqlite3-journal
+*.db-shm
+*.db-wal
+v2/data/*.txt
+latest_email_alert.txt
 
 # OS files
 .DS_Store

@@ -1,11 +1,10 @@
 import math
+from v2.models.physics import compute_dvorak_wind, compute_central_pressure, compute_ri_probability
 
 # Model 2: Calibrated Intensity Estimation (Slide 19)
 def estimate_intensity_v2(t_number: float, sst: float = 29.5, vws: float = 8.0):
-    wind_kts = 23.0 * (t_number ** 0.95)
-    wind_kmph = wind_kts * 1.852
-    wind_kmph += (sst - 28.0) * 4.2 - (vws - 10.0) * 1.5
-    central_pressure = 1010.0 - 0.72 * ((wind_kts / 0.88) ** 1.15)
+    wind_kts, wind_kmph = compute_dvorak_wind(t_number, sst, vws)
+    central_pressure = compute_central_pressure(wind_kts)
     error_margin_kmph = 12.5 if t_number < 3.5 else 18.0
     return {
         "wind_kts": round(wind_kts, 1),
@@ -17,9 +16,7 @@ def estimate_intensity_v2(t_number: float, sst: float = 29.5, vws: float = 8.0):
 
 # Model 3: Probabilistic RI Classifier (Slide 20)
 def predict_rapid_intensification(current_wind_kts: float, sst: float, vws: float, rh_mid: float):
-    logit = -3.2 + (0.28 * (sst - 26.5)) - (0.18 * (vws - 10.0)) + (0.04 * (rh_mid - 60.0))
-    prob = 1.0 / (1.0 + math.exp(-logit))
-    prob = max(0.05, min(0.95, prob))
+    prob = compute_ri_probability(sst, vws, rh_mid)
     return {
         "ri_probability": round(prob, 2),
         "ri_status": "HIGH" if prob > 0.65 else "MODERATE" if prob > 0.35 else "LOW",

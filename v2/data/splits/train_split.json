@@ -1,0 +1,8 @@
+{
+  "split": "train",
+  "storms": [
+    "Fani",
+    "Amphan",
+    "Biparjoy"
+  ]
+}

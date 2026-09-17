@@ -1,12 +1,51 @@
 import math
-from datetime import datetime
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from datetime import datetime, timezone
+
+class ObjectiveDvorakNetwork(nn.Module):
+    def __init__(self):
+        super(ObjectiveDvorakNetwork, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(4, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2, 2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2, 2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(2, 2),
+            nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool2d((4, 4))
+        )
+        self.fc_shared = nn.Sequential(
+            nn.Linear(256 * 4 * 4, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.3)
+        )
+        self.fc_t_number = nn.Linear(256, 1)
+        self.fc_wind = nn.Linear(256, 1)
+        self.fc_pressure = nn.Linear(256, 1)
+
+    def forward(self, x):
+        feat = self.features(x)
+        feat = feat.view(feat.size(0), -1)
+        shared = self.fc_shared(feat)
+        return self.fc_t_number(shared), self.fc_wind(shared), self.fc_pressure(shared)
 
 class PredictionResult:
     def __init__(self, value, unit, uncertainty, source, model_version='v2.1-production'):
         self.value = value
         self.unit = unit
         self.uncertainty = uncertainty
-        self.timestamp = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+        self.timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
         self.source = source
         self.model_version = model_version
 
@@ -20,32 +59,13 @@ class PredictionResult:
             'model_version': self.model_version
         }
 
+from v2.models.physics import compute_dvorak_wind, compute_central_pressure, compute_ri_probability, classify_imd_stage
+
 def predict_cyclone_v2(t_number, sst=29.8, vws=7.5, rh_mid=78.0, lat=19.8, lon=85.8):
-    # 1. Calibrated Intensity (Atkinson-Holliday Physics on Real North Indian Ocean Data)
-    wind_kts = 23.0 * (t_number ** 0.95)
-    wind_kmph = wind_kts * 1.852
-    wind_kmph += (sst - 28.0) * 4.0 - (vws - 10.0) * 1.5
-    central_pres = 1010.0 - 0.72 * ((wind_kts / 0.88) ** 1.15)
-    
-    # 2. Rapid Intensification (RI) Classifier (Slide 23)
-    logit = -3.2 + (0.28 * (sst - 26.5)) - (0.18 * (vws - 10.0)) + (0.04 * (rh_mid - 60.0))
-    ri_prob = round(1.0 / (1.0 + math.exp(-logit)), 2)
-    
-    # 3. IMD Classification Stage Mapping
-    if wind_kmph < 51:
-        stage, stage_code = 'Depression', 'D'
-    elif wind_kmph < 62:
-        stage, stage_code = 'Deep Depression', 'DD'
-    elif wind_kmph < 88:
-        stage, stage_code = 'Cyclonic Storm', 'CS'
-    elif wind_kmph < 117:
-        stage, stage_code = 'Severe Cyclonic Storm', 'SCS'
-    elif wind_kmph < 166:
-        stage, stage_code = 'Very Severe Cyclonic Storm', 'VSCS'
-    elif wind_kmph < 221:
-        stage, stage_code = 'Extremely Severe Cyclonic Storm', 'ESCS'
-    else:
-        stage, stage_code = 'Super Cyclonic Storm', 'SuCS'
+    wind_kts, wind_kmph = compute_dvorak_wind(t_number, sst, vws)
+    central_pres = compute_central_pressure(wind_kts)
+    ri_prob = compute_ri_probability(sst, vws, rh_mid)
+    stage, stage_code = classify_imd_stage(wind_kmph)
 
     return {
         'intensity': PredictionResult(round(wind_kmph, 1), 'km/h', {'ci_90': [round(wind_kmph-12, 1), round(wind_kmph+12, 1)]}, 'NOAA IBTrACS / IMD RSMC').to_dict(),

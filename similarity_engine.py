@@ -1,4 +1,4 @@
-﻿class CycloneSimilarityEngine:
+class CycloneSimilarityEngine:
     def __init__(self):
         self.historical_database = [
             {
