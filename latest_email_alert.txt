@@ -1,0 +1,7 @@
+Subject: 🚨 URGENT: Tropical Cyclone Emergency Advisory Bulletin (MoES / IMD)
+
+Official Cyclone Warning Bulletin issued by CycloVision AI National Decision Support System.
+System: Very Severe Cyclonic Storm (VSCS) BOB-02
+Estimated Central Pressure: 965 hPa | Max Wind: 165 km/h
+Landfall Sector: Odisha & North Andhra Coast.
+All coastal district magistrates and relief commissioners are requested to initiate Phase-3 evacuation.
