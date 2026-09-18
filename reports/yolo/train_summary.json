@@ -1,0 +1,8 @@
+{
+  "hardware": "CPU (8 threads)",
+  "imgsz": 320,
+  "epochs": 8,
+  "batch": 8,
+  "best_weights": "E:\\CycloVision\\models\\yolo\\best.pt",
+  "save_dir": "E:\\CycloVision\\reports\\yolo\\train_run"
+}

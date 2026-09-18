@@ -1,0 +1,19 @@
+{
+  "model_weights": "E:\\CycloVision\\models\\yolo\\best.pt",
+  "dataset": "E:\\CycloVision\\datasets\\cyclone_detection\\data.yaml",
+  "precision": 0.9699,
+  "recall": 0.5,
+  "f1_score": 0.6598,
+  "mAP50": 0.9309,
+  "mAP50_95": 0.8549,
+  "inference_speed_ms": {
+    "preprocess": 0.35898125003086534,
+    "inference": 20.66861250000329,
+    "postprocess": 1.0903374999884363,
+    "total_latency": 22.12
+  },
+  "classes": {
+    "0": "cyclone_eye",
+    "1": "cyclone_body"
+  }
+}

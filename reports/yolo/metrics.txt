@@ -1,0 +1,8 @@
+=== CYCLOVISION AI YOLOV8 DETECTION BENCHMARK ===
+Weights: E:\CycloVision\models\yolo\best.pt
+Precision: 0.9699
+Recall: 0.5000
+F1 Score: 0.6598
+mAP@0.50: 0.9309
+mAP@0.50:0.95: 0.8549
+Total Inference Latency: 22.12 ms/frame

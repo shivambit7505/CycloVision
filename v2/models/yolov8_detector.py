@@ -27,7 +27,11 @@ class CycloneCenterDetector:
                 if self.model_path and os.path.exists(self.model_path):
                     self._yolo = YOLO(self.model_path)
                 else:
-                    self._yolo = YOLO("yolov8n.pt")
+                    custom_best = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "models", "yolo", "best.pt")
+                    if os.path.exists(custom_best):
+                        self._yolo = YOLO(custom_best)
+                    else:
+                        self._yolo = YOLO("yolov8n.pt")
             except Exception:
                 self._yolo = None
             self._initialized = True
