@@ -89,9 +89,16 @@ def train_multilayer_model(epochs=6, batch_size=8, lr=0.001):
     print("=" * 70)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if device.type == "cpu":
+        threads = max(1, (os.cpu_count() or 4) - 1)
+        torch.set_num_threads(threads)
+        print(f"Running on Optimized CPU ({threads} threads)")
+    else:
+        print(f"Running on CUDA GPU ({torch.cuda.get_device_name(0)})")
+
     model = ObjectiveDvorakNetwork().to(device)
 
-    dataset = MultiLayerCycloneDataset(num_samples=600)
+    dataset = MultiLayerCycloneDataset(num_samples=400 if device.type == "cpu" else 1500)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     criterion_l1 = nn.SmoothL1Loss()

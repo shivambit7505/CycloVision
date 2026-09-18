@@ -1,0 +1,22 @@
+{
+  "name": "cyclovision-ai",
+  "version": "2.1.0",
+  "description": "CycloVision AI - Tropical Cyclone Early Warning and Decision Support System",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/input.css -o ./static/tailwind.css --minify",
+    "dev": "echo 'Frontend served directly by FastAPI at http://127.0.0.1:8000/'"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "recharts": "^2.15.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}

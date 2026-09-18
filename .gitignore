@@ -23,3 +23,8 @@ latest_email_alert.txt
 # OS files
 .DS_Store
 Thumbs.db
+
+# Node.js artifacts
+node_modules/
+npm-debug.log*
+
