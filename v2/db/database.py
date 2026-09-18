@@ -64,6 +64,25 @@ def init_db(db_path: Optional[str] = None) -> None:
             ON weather_observations(latitude, longitude, timestamp);
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS satellite_images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                original_url TEXT NOT NULL,
+                processed_url TEXT NOT NULL,
+                source TEXT NOT NULL,
+                satellite TEXT NOT NULL,
+                original_dimensions TEXT NOT NULL,
+                processed_dimensions TEXT NOT NULL,
+                file_size_bytes INTEGER NOT NULL,
+                processing_status TEXT NOT NULL,
+                attribution TEXT,
+                metadata_json TEXT,
+                timestamp TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+        """)
+
         cursor.execute("SELECT COUNT(*) FROM audit_reviews;")
         if cursor.fetchone()[0] == 0:
             initial_records = [
@@ -198,5 +217,45 @@ def get_latest_weather_observation(latitude: float, longitude: float, max_distan
         row = cursor.fetchone()
         return dict(row) if row else None
 
+def save_satellite_image_metadata(
+    filename: str,
+    original_url: str,
+    processed_url: str,
+    source: str,
+    satellite: str,
+    original_dimensions: str,
+    processed_dimensions: str,
+    file_size_bytes: int,
+    processing_status: str,
+    attribution: str = "",
+    metadata_json: Optional[str] = None
+) -> int:
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO satellite_images (
+                filename, original_url, processed_url, source, satellite,
+                original_dimensions, processed_dimensions, file_size_bytes,
+                processing_status, attribution, metadata_json, timestamp, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (
+            filename, original_url, processed_url, source, satellite,
+            original_dimensions, processed_dimensions, file_size_bytes,
+            processing_status, attribution, metadata_json, now_str, now_str
+        ))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_satellite_images(limit: int = 50) -> List[Dict[str, Any]]:
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM satellite_images
+            ORDER BY id DESC LIMIT ?;
+        """, (limit,))
+        return [dict(r) for r in cursor.fetchall()]
+
 init_db()
+
 

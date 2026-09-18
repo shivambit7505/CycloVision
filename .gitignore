@@ -17,6 +17,13 @@ env/
 *.sqlite3-journal
 *.db-shm
 *.db-wal
+*.db
+scratch/
+*.pt
+
+# Uploads & User runtime storage
+static/uploads/
+
 v2/data/*.txt
 latest_email_alert.txt
 

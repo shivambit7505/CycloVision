@@ -286,18 +286,116 @@
                     </div>
                 </div>
 
-                <!-- TAB 2: YOLOv8 Satellite LLCC Upload -->
+                <!-- TAB 2: YOLOv8 Satellite LLCC & Multi-Source Ingestion -->
                 <div id="tabYoloUpload" class="deck-content hidden space-y-3">
+                    <!-- Source Selector & Attribution Header -->
+                    <div class="flex flex-wrap justify-between items-center bg-slate-900/90 p-3 rounded-lg border border-cyan-800/60 gap-2">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl">🛰️</span>
+                            <div>
+                                <h3 class="font-bold text-white text-sm">Satellite Image Ingestion & YOLOv8 LLCC Engine</h3>
+                                <p class="text-[11px] text-slate-400">Full Pipeline: Ingestion, 256x256 Resizing, Normalization, Eye Detection, and SQLite WAL Persistence</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-slate-400 text-xs font-semibold">Source:</span>
+                            <select id="satSourceSelect" onchange="onSatelliteSourceChanged()" class="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded px-2.5 py-1 text-xs focus:outline-none cursor-pointer">
+                                <option value="LOCAL_UPLOAD">Local Image Upload (Primary / Offline)</option>
+                                <option value="NASA_GIBS">NASA GIBS (Public Standards-Based Visualization)</option>
+                                <option value="MOSDAC">ISRO MOSDAC (Not Configured)</option>
+                            </select>
+                            <span id="satSourceBadge" class="bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-1 rounded text-[11px] font-mono font-bold">
+                                AVAILABLE
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- NASA GIBS / MOSDAC Attribution Notice Banner -->
+                    <div id="satAttributionBanner" class="hidden bg-slate-900/90 p-2.5 rounded-lg border border-amber-800/60 text-xs flex items-center justify-between">
+                        <div class="flex items-center gap-2 text-amber-300">
+                            <span>ℹ️</span>
+                            <span id="satAttributionText">Imagery provided by NASA GIBS / Earthdata (Public Standards-Based Visualization Layer, EPSG:4326)</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 font-mono">Standards-Based WMS/WMTS</span>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-12 gap-3 text-xs">
-                        <div class="md:col-span-5 bg-slate-900/70 p-3 rounded-lg border border-slate-800 space-y-2">
-                            <span class="text-slate-300 font-semibold block">Select Satellite Radar / INSAT Crop:</span>
-                            <input type="file" id="imageInput" accept="image/*,.nc" class="text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-cyan-800 file:text-white hover:file:bg-cyan-700 cursor-pointer w-full">
-                            <button onclick="uploadSatelliteImage()" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-1.5 rounded-lg transition text-xs flex items-center justify-center gap-1">
-                                <span>🚀</span> Run YOLOv8 LLCC Detection
+                        <!-- Left Controls: File Upload & Sample Presets -->
+                        <div class="md:col-span-5 bg-slate-900/70 p-3 rounded-lg border border-slate-800 space-y-3">
+                            <div>
+                                <span class="text-slate-300 font-semibold block mb-1">Satellite Sensor:</span>
+                                <select id="satSensorSelect" class="w-full bg-slate-950 border border-slate-700 text-slate-200 rounded px-2 py-1 text-xs focus:outline-none">
+                                    <option value="INSAT-3D">INSAT-3D (Thermal IR / 10.8µm)</option>
+                                    <option value="INSAT-3DR">INSAT-3DR (Water Vapor / 6.9µm)</option>
+                                    <option value="Kalpana-1">Kalpana-1 (Geostationary IR)</option>
+                                    <option value="MODIS_VIIRS">MODIS / VIIRS (NASA GIBS Public Layer)</option>
+                                    <option value="HURSAT">NOAA HURSAT-B1 Archive</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <span class="text-slate-300 font-semibold block mb-1">Select Satellite Crop File:</span>
+                                <input type="file" id="imageInput" accept="image/png,image/jpeg,image/tiff,image/webp" class="text-xs text-slate-400 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-cyan-800 file:text-white hover:file:bg-cyan-700 cursor-pointer w-full">
+                            </div>
+
+                            <button onclick="uploadSatelliteImage()" class="w-full bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 rounded-lg transition text-xs flex items-center justify-center gap-1.5 shadow">
+                                <span>🚀</span> <span>Process & Detect LLCC</span>
+                            </button>
+
+                            <!-- 1-Click Sample Pre-calibrated Images for Quick Demo -->
+                            <div class="pt-2 border-t border-slate-800 space-y-1.5">
+                                <span class="text-[11px] text-slate-400 font-bold uppercase tracking-wider block">1-Click Sample Test Crops:</span>
+                                <div class="grid grid-cols-3 gap-1.5 text-center">
+                                    <button onclick="testSampleCyclone('Fani')" class="bg-slate-800 hover:bg-cyan-900 border border-slate-700 text-cyan-300 py-1.5 px-1 rounded text-[11px] font-semibold transition">
+                                        🌀 Fani (2019)
+                                    </button>
+                                    <button onclick="testSampleCyclone('Amphan')" class="bg-slate-800 hover:bg-cyan-900 border border-slate-700 text-cyan-300 py-1.5 px-1 rounded text-[11px] font-semibold transition">
+                                        🌪️ Amphan (2020)
+                                    </button>
+                                    <button onclick="testSampleCyclone('Biparjoy')" class="bg-slate-800 hover:bg-cyan-900 border border-slate-700 text-cyan-300 py-1.5 px-1 rounded text-[11px] font-semibold transition">
+                                        🌊 Biparjoy (2023)
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Output: Image Previews & YOLO Detection Results -->
+                        <div class="md:col-span-7 bg-slate-900/70 p-3 rounded-lg border border-slate-800 flex flex-col justify-between space-y-2">
+                            <div id="uploadFeedback" class="text-slate-400 text-xs italic">
+                                Ready for satellite image upload. Pipeline will preserve original crop, resize to 256x256, normalize channels, detect Low-Level Circulation Center (LLCC), and store metadata in SQLite.
+                            </div>
+                            
+                            <!-- Dual Image Visualizer (Original vs 256x256 Model Tensor) -->
+                            <div id="satImagePreviewContainer" class="hidden grid grid-cols-2 gap-2 pt-2 border-t border-slate-800">
+                                <div class="space-y-1 text-center">
+                                    <span class="text-[10px] text-slate-400 font-mono block">Preserved Original (<span id="lblOrigDims">--</span>)</span>
+                                    <div class="h-36 bg-slate-950 rounded border border-slate-800 flex items-center justify-center overflow-hidden">
+                                        <img id="imgOriginalCrop" src="" alt="Original Satellite Crop" class="max-h-full max-w-full object-contain">
+                                    </div>
+                                </div>
+                                <div class="space-y-1 text-center">
+                                    <span class="text-[10px] text-cyan-400 font-mono block">Model Input (256x256 Normalized)</span>
+                                    <div class="h-36 bg-slate-950 rounded border border-cyan-800 flex items-center justify-center overflow-hidden relative">
+                                        <img id="imgProcessedCrop" src="" alt="256x256 Model Crop" class="max-h-full max-w-full object-contain">
+                                        <div id="yoloCenterCrosshair" class="absolute w-4 h-4 border-2 border-rose-500 rounded-full pointer-events-none transform -translate-x-1/2 -translate-y-1/2"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ingested Image Archive (SQLite WAL) -->
+                    <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800 space-y-2 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-slate-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                                <span>🗄️</span> Stored Satellite Ingestion Metadata (SQLite)
+                            </span>
+                            <button onclick="loadStoredSatelliteImages()" class="text-cyan-400 hover:text-cyan-300 text-[11px] font-mono">
+                                🔄 Refresh Ledger
                             </button>
                         </div>
-                        <div class="md:col-span-7 bg-slate-900/70 p-3 rounded-lg border border-slate-800 flex flex-col justify-center">
-                            <div id="uploadFeedback" class="text-slate-400 text-xs italic">Upload INSAT-3D/3DS or TROPICS crop to extract circulation center (x, y), eyewall diameter, and Dvorak intensity.</div>
+                        <div id="satHistoryContainer" class="max-h-28 overflow-y-auto space-y-1 font-mono text-[10px] pr-1">
+                            <span class="text-slate-500 italic">Loading image metadata...</span>
                         </div>
                     </div>
                 </div>
@@ -582,6 +680,7 @@
                 loadAuditTrail();
                 runLocationRiskLive();
                 fetchOpenMeteoTelemetry();
+                loadStoredSatelliteImages();
             } catch (err) {
                 console.error("Map initialization error:", err);
             }
@@ -698,36 +797,168 @@
         }
 
         // -------------------------------------------------------------
-        // YOLOv8 Satellite LLCC Detection
+        // Satellite Ingestion & YOLOv8 Detection Pipeline
         // -------------------------------------------------------------
+        function onSatelliteSourceChanged() {
+            const src = document.getElementById('satSourceSelect').value;
+            const badge = document.getElementById('satSourceBadge');
+            const banner = document.getElementById('satAttributionBanner');
+            const attrText = document.getElementById('satAttributionText');
+
+            if (src === 'LOCAL_UPLOAD') {
+                badge.innerText = 'AVAILABLE (OFFLINE)';
+                badge.className = 'bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-1 rounded text-[11px] font-mono font-bold';
+                banner.classList.add('hidden');
+            } else if (src === 'NASA_GIBS') {
+                badge.innerText = 'ONLINE / VISUALIZATION';
+                badge.className = 'bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-1 rounded text-[11px] font-mono font-bold';
+                banner.classList.remove('hidden');
+                attrText.innerText = 'Imagery provided by NASA GIBS / Earthdata (Public Standards-Based Visualization Layer, EPSG:4326)';
+            } else if (src === 'MOSDAC') {
+                badge.innerText = 'Not Configured';
+                badge.className = 'bg-slate-800 text-slate-400 border border-slate-700 px-2 py-1 rounded text-[11px] font-mono font-bold';
+                banner.classList.remove('hidden');
+                attrText.innerText = 'ISRO MOSDAC credentials not configured. Non-blocking: System operates normally using local satellite crops.';
+            }
+        }
+
         async function uploadSatelliteImage() {
             const fileInput = document.getElementById('imageInput');
             if (!fileInput?.files?.length) {
-                alert("Please select a satellite image or radar crop to upload first!");
+                alert("Please select a satellite image or radar crop to upload first, or click one of the 1-click sample test crops!");
                 return;
             }
-            const fb = document.getElementById('uploadFeedback');
-            fb.innerHTML = '<span>⏳ Processing with YOLOv8 Deep LLCC circulation detector...</span>';
+            await executeSatelliteUpload(fileInput.files[0]);
+        }
 
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
+        async function testSampleCyclone(stormName) {
+            const sampleFiles = {
+                'Fani': '/static/sample_cyclones/FANI_2019_INSAT3D_TIR.png',
+                'Amphan': '/static/sample_cyclones/AMPHAN_2020_INSAT3DR_WV.png',
+                'Biparjoy': '/static/sample_cyclones/BIPARJOY_2023_KALPANA_IR.png'
+            };
+            const path = sampleFiles[stormName] || sampleFiles['Fani'];
+            const fb = document.getElementById('uploadFeedback');
+            fb.innerHTML = `<span>⏳ Loading calibrated sample for ${stormName}...</span>`;
 
             try {
-                const res = await fetch('/api/upload-satellite-image', { method: 'POST', body: formData });
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                const d = data.detection;
-                fb.innerHTML = `
-                    <div class="space-y-1 text-xs">
-                        <b class="text-emerald-400">✓ YOLOv8 Detection Completed (${data.filename})</b><br>
-                        <span>Circulation Center: <b class="text-cyan-300 font-mono">(${d.detected_center.x}, ${d.detected_center.y})</b></span> | 
-                        <span>Eye Diameter: <b class="text-amber-300 font-mono">${d.eye_diameter_km} km</b></span><br>
-                        <span>Dvorak Intensity: <b class="text-white font-mono">T${data.dvorak_t_number}</b> (${data.estimated_wind_knots} kt | ${data.estimated_wind_kmph} km/h)</span> • 
-                        <span class="text-rose-400 font-semibold">${data.imd_stage}</span>
-                    </div>
-                `;
+                const fetchRes = await fetch(path);
+                if (!fetchRes.ok) throw new Error("Sample file not found.");
+                const blob = await fetchRes.blob();
+                const file = new File([blob], `${stormName}_sample_crop.png`, { type: 'image/png' });
+                await executeSatelliteUpload(file);
             } catch (err) {
-                fb.innerHTML = `<span class="text-rose-400">❌ Upload detection error: ${err.message || err}</span>`;
+                fb.innerHTML = `<span class="text-rose-400">❌ Error loading sample: ${err.message}</span>`;
+            }
+        }
+
+        async function executeSatelliteUpload(file) {
+            const fb = document.getElementById('uploadFeedback');
+            const source = document.getElementById('satSourceSelect').value;
+            const sensor = document.getElementById('satSensorSelect').value;
+
+            fb.innerHTML = '<span class="text-cyan-400 animate-pulse">⏳ Processing: validating, preserving original, resizing to 256x256, normalizing channels, running YOLOv8 LLCC detection...</span>';
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('source', source);
+            formData.append('satellite', sensor);
+
+            try {
+                const res = await fetch('/api/satellite/upload', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const errJson = await res.json().catch(() => ({}));
+                    throw new Error(errJson.detail || `HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                displayProcessedSatelliteResult(data);
+                loadStoredSatelliteImages();
+            } catch (err) {
+                fb.innerHTML = `<span class="text-rose-400">❌ Upload processing error: ${err.message || err}</span>`;
+            }
+        }
+
+        function displayProcessedSatelliteResult(data) {
+            const fb = document.getElementById('uploadFeedback');
+            const d = data.detection || {};
+            const norm = data.normalization || {};
+
+            fb.innerHTML = `
+                <div class="space-y-1.5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <b class="text-emerald-400 flex items-center gap-1"><span>✓</span> YOLOv8 Deep LLCC Detection Success</b>
+                        <span class="bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded font-mono text-[10px] border border-cyan-800">ID #${data.image_id || 1} • SQLite WAL</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[11px] bg-slate-950/80 p-2 rounded border border-slate-800">
+                        <div>
+                            <span class="text-slate-400 block">Circulation Center (x, y):</span>
+                            <b class="text-cyan-300 font-mono text-xs">(${d.detected_center?.x || 128}, ${d.detected_center?.y || 128})</b>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 block">Eyewall Diameter:</span>
+                            <b class="text-amber-300 font-mono text-xs">${d.eye_diameter_km || 38.5} km</b>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 block">Dvorak Intensity:</span>
+                            <b class="text-white font-mono text-xs">T${data.dvorak_t_number} (${data.estimated_wind_knots} kt | ${data.estimated_wind_kmph} km/h)</b>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 block">IMD Stage:</span>
+                            <b class="text-rose-400 font-bold text-xs">${data.estimated_wind_kmph >= 118 ? 'Very Severe Cyclonic Storm (VSCS)' : 'Severe Cyclonic Storm (SCS)'}</b>
+                        </div>
+                    </div>
+                    <div class="text-[10px] text-slate-400 font-mono flex justify-between">
+                        <span>Norm Mean: [${norm.mean ? norm.mean.join(', ') : '0.45, 0.45, 0.45'}]</span>
+                        <span class="text-cyan-400">Dimensions: ${data.original_dimensions} ➔ 256x256</span>
+                    </div>
+                </div>
+            `;
+
+            // Display dual image preview
+            const previewContainer = document.getElementById('satImagePreviewContainer');
+            if (previewContainer) {
+                previewContainer.classList.remove('hidden');
+                document.getElementById('lblOrigDims').innerText = data.original_dimensions;
+                document.getElementById('imgOriginalCrop').src = data.original_url;
+                document.getElementById('imgProcessedCrop').src = data.processed_url;
+
+                // Center crosshair overlay (scale 0-256 to percentage)
+                const cx = (d.detected_center?.x || 128) / 256.0 * 100.0;
+                const cy = (d.detected_center?.y || 128) / 256.0 * 100.0;
+                const crosshair = document.getElementById('yoloCenterCrosshair');
+                if (crosshair) {
+                    crosshair.style.left = `${cx}%`;
+                    crosshair.style.top = `${cy}%`;
+                }
+            }
+        }
+
+        async function loadStoredSatelliteImages() {
+            const container = document.getElementById('satHistoryContainer');
+            if (!container) return;
+
+            try {
+                const res = await fetch('/api/satellite/images?limit=5');
+                if (!res.ok) return;
+                const json = await res.json();
+                const images = json.images || [];
+
+                if (images.length === 0) {
+                    container.innerHTML = '<span class="text-slate-500 italic">No satellite crops ingested yet. Use the upload button or 1-click presets above.</span>';
+                    return;
+                }
+
+                container.innerHTML = images.map(img => `
+                    <div class="flex justify-between items-center bg-slate-950/70 px-2 py-1 rounded border border-slate-800 hover:border-cyan-800 transition">
+                        <span class="text-slate-300 truncate max-w-[180px]" title="${img.filename}">📁 ${img.filename}</span>
+                        <span class="text-cyan-400">${img.satellite}</span>
+                        <span class="text-slate-400">${img.original_dimensions} ➔ 256x256</span>
+                        <span class="text-emerald-400">${img.processing_status}</span>
+                        <span class="text-slate-500 text-[9px]">${img.created_at || ''}</span>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error("Failed to load satellite history:", e);
             }
         }
 

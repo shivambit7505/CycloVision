@@ -1,7 +1,7 @@
 import os
 import math
 from typing import Optional, List, Dict
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -23,6 +23,8 @@ from v2.models.swin_convlstm import forecast_with_swin_convlstm
 from v2.gis.geodesic_radar import haversine_distance_km, compute_wind_radii, evaluate_shelter_risk
 from external_service import ExternalIntelligenceService
 from v2.services.weather_service import get_weather_provider
+from v2.services.satellite_service import validate_and_process_satellite_image, get_satellite_sources_status
+from v2.db.database import get_satellite_images
 
 ext_service = ExternalIntelligenceService()
 
@@ -142,18 +144,24 @@ def analyze_cyclone(req: CycloneAnalysisRequest):
         "reliability_telemetry": {"latency_ms": 42, "uptime": "99.98%"}
     }
 
+@app.post("/api/satellite/upload")
 @app.post("/api/upload-satellite-image")
-async def upload_satellite_image(file: UploadFile = File(...)):
-    filename = file.filename or "uploaded_image"
-    ext = os.path.splitext(filename)[1].lower()
-    content_type = file.content_type or ""
-
-    if not (content_type.startswith("image/") or ext in ALLOWED_IMAGE_EXTENSIONS):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file format. Please upload an image file (PNG, JPG, TIFF, NC)."
-        )
-
+async def api_satellite_upload(
+    file: UploadFile = File(...),
+    source: str = Form("LOCAL_UPLOAD"),
+    satellite: str = Form("INSAT-3D")
+):
+    """
+    Satellite Image Ingestion & Processing Pipeline:
+    - Validates image
+    - Preserves exact original
+    - Resizes to standard model input (256x256)
+    - Computes normalization statistics
+    - Saves processed model copy
+    - Persists metadata to SQLite
+    - Performs YOLOv8 LLCC detection
+    """
+    filename = file.filename or "uploaded_image.png"
     try:
         contents = await file.read(MAX_FILE_SIZE_BYTES + 1)
         if len(contents) > MAX_FILE_SIZE_BYTES:
@@ -163,21 +171,26 @@ async def upload_satellite_image(file: UploadFile = File(...)):
     finally:
         await file.close()
 
-    # YOLOv8 Low-Level Circulation Center (LLCC) detection engine
-    detection_res = detect_cyclone_center(contents)
-    computed_t = detection_res["dvorak_t_number"]
-    wind_kts = detection_res["estimated_wind_knots"]
-    wind_kmph = detection_res["estimated_wind_kmph"]
-    
-    return {
-        "status": "PROCESSED",
-        "filename": filename,
-        "detection": detection_res,
-        "dvorak_t_number": computed_t,
-        "estimated_wind_knots": wind_kts,
-        "estimated_wind_kmph": wind_kmph,
-        "imd_stage": "Very Severe Cyclonic Storm (VSCS)" if wind_kmph >= 118 else "Severe Cyclonic Storm (SCS)"
-    }
+    try:
+        result = validate_and_process_satellite_image(
+            file_bytes=contents,
+            filename=filename,
+            source=source,
+            satellite=satellite
+        )
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image processing failed: {e}")
+
+@app.get("/api/satellite/images")
+def api_get_satellite_images(limit: int = 50):
+    return {"images": get_satellite_images(limit=limit)}
+
+@app.get("/api/satellite/sources")
+def api_get_satellite_sources():
+    return get_satellite_sources_status()
 
 @app.post("/api/send-telegram-alert")
 def send_telegram_alert():
