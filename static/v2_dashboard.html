@@ -231,7 +231,10 @@
             <div class="panel p-4 space-y-3">
                 <!-- Navigation Tabs -->
                 <div class="flex flex-wrap items-center gap-1.5 border-b border-slate-800 pb-2.5 text-xs">
-                    <button onclick="switchDeckTab('tabWhatIf')" id="btnTabWhatIf" class="tab-btn active px-3 py-1.5 rounded-lg border border-transparent hover:bg-slate-800 transition flex items-center gap-1">
+                    <button onclick="switchDeckTab('tabGruTrajectory')" id="btnTabGruTrajectory" class="tab-btn active px-3 py-1.5 rounded-lg border border-transparent hover:bg-slate-800 transition flex items-center gap-1">
+                        <span>🧭</span> GRU Trajectory & AI Fusion
+                    </button>
+                    <button onclick="switchDeckTab('tabWhatIf')" id="btnTabWhatIf" class="tab-btn px-3 py-1.5 rounded-lg border border-transparent hover:bg-slate-800 transition flex items-center gap-1">
                         <span>🧪</span> What-If Simulator
                     </button>
                     <button onclick="switchDeckTab('tabYoloUpload')" id="btnTabYoloUpload" class="tab-btn px-3 py-1.5 rounded-lg border border-transparent hover:bg-slate-800 transition flex items-center gap-1">
@@ -251,8 +254,171 @@
                     </button>
                 </div>
 
+                <!-- TAB 0: GRU Trajectory Predictor & Data Fusion -->
+                <div id="tabGruTrajectory" class="deck-content space-y-3.5 text-xs">
+                    <!-- Top Control & Status Banner -->
+                    <div class="flex flex-wrap justify-between items-center bg-slate-900/90 p-3 rounded-lg border border-cyan-800/60 gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-2xl">🧭</span>
+                            <div>
+                                <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                                    GRU Cyclone Trajectory Predictor & Data Fusion
+                                    <span class="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-mono">PyTorch GRU-64</span>
+                                </h3>
+                                <p class="text-[11px] text-slate-400">Multi-step spatiotemporal forecasting (+6h to +36h) coupled with live Open-Meteo weather & transparent risk scoring</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-slate-400 text-xs font-semibold">Mode:</span>
+                            <select id="gruModeSelect" onchange="runGruAnalysis()" class="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded px-2.5 py-1 text-xs focus:outline-none cursor-pointer">
+                                <option value="demo">Demo Mode (NOAA IBTrACS Cyclone FANI Historical Track)</option>
+                                <option value="active">Active Selected Target Storm</option>
+                            </select>
+                            <span id="gruDataLabel" class="bg-amber-950 text-amber-300 border border-amber-800 px-2.5 py-1 rounded text-[11px] font-mono font-bold">
+                                DEMO / HISTORICAL DATA
+                            </span>
+                            <button onclick="runGruAnalysis()" id="btnRunGru" class="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 shadow transition">
+                                <span>⚡</span> Run GRU Fusion Analysis
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="gruStatusFeedback" class="text-[11px] text-cyan-400 italic">
+                        Ready. Click 'Run GRU Fusion Analysis' to evaluate neural trajectory, co-located weather, and coastal risk.
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+                        <!-- Left Sub-column (5 cols): Current State, Risk Level, and Weather -->
+                        <div class="lg:col-span-5 space-y-3">
+                            <!-- Current Cyclone State -->
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                                <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider block flex items-center justify-between">
+                                    <span>📍 Current Cyclone State</span>
+                                    <span id="gruStormTitle" class="text-cyan-400 font-mono">FANI (2019)</span>
+                                </span>
+                                <div class="grid grid-cols-2 gap-2 text-[11px] font-mono">
+                                    <div class="bg-slate-950 p-2 rounded border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] block">Position</span>
+                                        <b class="text-white text-xs" id="gruCurPos">6.4°N, 88.9°E</b>
+                                    </div>
+                                    <div class="bg-slate-950 p-2 rounded border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] block">Wind Velocity</span>
+                                        <b class="text-cyan-300 text-xs" id="gruCurWind">45.0 kt (83.3 km/h)</b>
+                                    </div>
+                                    <div class="bg-slate-950 p-2 rounded border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] block">Central Pressure</span>
+                                        <b class="text-teal-300 text-xs" id="gruCurPres">992.0 hPa</b>
+                                    </div>
+                                    <div class="bg-slate-950 p-2 rounded border border-slate-800">
+                                        <span class="text-slate-400 text-[10px] block">Stage</span>
+                                        <b class="text-amber-300 text-xs" id="gruCurStage">Cyclonic Storm</b>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Transparent Risk Assessment -->
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span>🛡️</span> Coastal Risk Assessment
+                                    </span>
+                                    <span id="gruRiskAlertBadge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                                        YELLOW ALERT
+                                    </span>
+                                </div>
+                                <div class="p-2 rounded bg-slate-950 border border-slate-800 space-y-1 text-[11px]">
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Threatened Target:</span>
+                                        <b class="text-rose-400 font-mono" id="gruRiskTarget">Puri Coast (112 km)</b>
+                                    </div>
+                                    <div class="text-[10px] text-slate-300 pt-1 border-t border-slate-800/80" id="gruRiskAction">
+                                        Heightened state surveillance. Ports put on local cautionary signal LC-3.
+                                    </div>
+                                </div>
+                                <div id="gruRiskFactorsList" class="space-y-1 text-[10px] text-slate-400 font-mono">
+                                    <!-- Dynamic factors -->
+                                </div>
+                            </div>
+
+                            <!-- Co-located Live Weather -->
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                                <div class="flex justify-between items-center text-[11px]">
+                                    <span class="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1">
+                                        <span>🌐</span> Co-Located Weather Telemetry
+                                    </span>
+                                    <span class="text-[10px] font-mono text-cyan-300 bg-cyan-950 border border-cyan-800 px-1.5 py-0.5 rounded">Open-Meteo</span>
+                                </div>
+                                <div class="grid grid-cols-3 gap-1.5 text-center font-mono text-[11px]">
+                                    <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+                                        <span class="text-[9px] text-slate-400 block">Temperature</span>
+                                        <b class="text-cyan-300 text-xs" id="gruWeatherTemp">-- °C</b>
+                                    </div>
+                                    <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+                                        <span class="text-[9px] text-slate-400 block">Pressure</span>
+                                        <b class="text-teal-300 text-xs" id="gruWeatherPres">-- hPa</b>
+                                    </div>
+                                    <div class="bg-slate-950 p-1.5 rounded border border-slate-800">
+                                        <span class="text-[9px] text-slate-400 block">Wind Speed</span>
+                                        <b class="text-amber-300 text-xs" id="gruWeatherWind">-- km/h</b>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Sub-column (7 cols): Prediction Points Table & AI Explanation -->
+                        <div class="lg:col-span-7 space-y-3">
+                            <!-- Prediction Horizon Table -->
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                                <span class="text-[11px] font-bold text-slate-300 uppercase tracking-wider block flex items-center justify-between">
+                                    <span>🎯 GRU Multi-Step Trajectory Forecast (6-Step Horizon)</span>
+                                    <span class="text-[10px] text-slate-400 font-mono">Step Size: 6 Hours</span>
+                                </span>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-left text-[11px] font-mono">
+                                        <thead class="bg-slate-950 text-slate-400 border-b border-slate-800">
+                                            <tr>
+                                                <th class="p-1.5">Horizon</th>
+                                                <th class="p-1.5">Forecast Lat</th>
+                                                <th class="p-1.5">Forecast Lon</th>
+                                                <th class="p-1.5">Uncertainty Cone</th>
+                                                <th class="p-1.5">Lead Hours</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="gruPredictionTableBody" class="divide-y divide-slate-800/60 text-slate-300">
+                                            <tr><td colspan="5" class="p-2 text-center text-slate-500 italic">Click 'Run GRU Fusion Analysis' to generate predictions</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- Explainable AI (XAI) / Empirical Feature Importance -->
+                            <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
+                                <div class="flex justify-between items-center text-[11px]">
+                                    <span class="font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                        <span>🔍</span> Explainable AI (XAI) — Empirical Feature Sensitivity
+                                    </span>
+                                    <span class="text-[10px] font-mono text-emerald-400 bg-emerald-950 border border-emerald-800 px-1.5 py-0.5 rounded">
+                                        d(Coord) / d(Feature)
+                                    </span>
+                                </div>
+                                <p class="text-[10px] text-slate-400" id="gruXaiDescription">
+                                    Empirical gradient sensitivity computed directly by perturbing the trained GRU neural weights:
+                                </p>
+                                <!-- Feature Bars Grid -->
+                                <div id="gruFeatureBarsGrid" class="grid grid-cols-2 gap-2 text-[10px] font-mono">
+                                    <!-- Dynamic bars -->
+                                </div>
+                                <!-- Synoptic Rationale -->
+                                <div class="p-2 rounded bg-slate-950 border border-slate-800 text-[10px] text-cyan-300/90 font-mono" id="gruXaiRationale">
+                                    Trajectory forecast is primarily governed by recent geographic coordinates and motion velocity vectors.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- TAB 1: What-If Simulator -->
-                <div id="tabWhatIf" class="deck-content space-y-3">
+                <div id="tabWhatIf" class="deck-content hidden space-y-3">
                     <div class="text-xs text-slate-400">Perturb environmental thermodynamic drivers to simulate Rapid Intensification (RI) sensitivity:</div>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                         <div class="bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 space-y-1">
@@ -681,6 +847,7 @@
                 runLocationRiskLive();
                 fetchLiveWeather(19.8, 85.8);
                 loadStoredSatelliteImages();
+                runGruAnalysis();
             } catch (err) {
                 console.error("Map initialization error:", err);
             }
@@ -749,6 +916,270 @@
         }
 
         // -------------------------------------------------------------
+        // GRU Spatiotemporal Trajectory Predictor & Data Fusion
+        // -------------------------------------------------------------
+        let gruTrackPolyline = null;
+        let gruForecastPolyline = null;
+        let gruMarkers = [];
+
+        async function runGruAnalysis() {
+            const modeSelect = document.getElementById('gruModeSelect');
+            const isDemo = modeSelect ? (modeSelect.value === 'demo') : true;
+            const stormId = document.getElementById('stormSelect') ? document.getElementById('stormSelect').value : 'FANI_2019';
+            const feedback = document.getElementById('gruStatusFeedback');
+            const btn = document.getElementById('btnRunGru');
+
+            if (btn) btn.disabled = true;
+            if (feedback) feedback.innerText = '⚡ Connecting to PyTorch GRU model & Open-Meteo telemetry...';
+
+            try {
+                const res = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        storm_id: stormId,
+                        use_demo_mode: isDemo,
+                        steps: 6,
+                        include_weather: true
+                    })
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(`Server returned ${res.status}: ${errText}`);
+                }
+
+                const data = await res.json();
+                updateGruDashboard(data);
+                if (feedback) {
+                    feedback.innerText = `✓ Analysis complete. Source: ${data.data_source_label} • Risk: ${data.risk_assessment ? data.risk_assessment.alert_tier : 'Active'}`;
+                }
+            } catch (err) {
+                console.error("GRU Analysis Error:", err);
+                if (feedback) {
+                    feedback.innerText = `⚠️ Analysis failed: ${err.message}`;
+                }
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function updateGruDashboard(data) {
+            if (!data) return;
+
+            // 1. Data Source Badge
+            const badge = document.getElementById('gruDataLabel');
+            if (badge) {
+                badge.innerText = data.data_source_label || 'DEMO / HISTORICAL DATA';
+                if (data.is_demo) {
+                    badge.className = "bg-amber-950 text-amber-300 border border-amber-800 px-2.5 py-1 rounded text-[11px] font-mono font-bold";
+                } else {
+                    badge.className = "bg-emerald-950 text-emerald-300 border border-emerald-800 px-2.5 py-1 rounded text-[11px] font-mono font-bold";
+                }
+            }
+
+            // 2. Current Cyclone State
+            const cur = data.current_cyclone_position || {};
+            if (document.getElementById('gruStormTitle')) {
+                document.getElementById('gruStormTitle').innerText = data.storm_name || 'Cyclone';
+            }
+            if (document.getElementById('gruCurPos')) {
+                document.getElementById('gruCurPos').innerText = `${cur.latitude}°N, ${cur.longitude}°E`;
+            }
+            if (document.getElementById('gruCurWind')) {
+                document.getElementById('gruCurWind').innerText = `${cur.wind_kts} kt (${cur.wind_kmph} km/h)`;
+            }
+            if (document.getElementById('gruCurPres')) {
+                document.getElementById('gruCurPres').innerText = `${cur.pressure_hpa} hPa`;
+            }
+            if (document.getElementById('gruCurStage')) {
+                document.getElementById('gruCurStage').innerText = cur.stage || 'Cyclonic Storm';
+            }
+
+            // 3. Coastal Risk Assessment
+            const risk = data.risk_assessment || {};
+            const riskBadge = document.getElementById('gruRiskAlertBadge');
+            if (riskBadge) {
+                riskBadge.innerText = `${risk.risk_level || 'EVALUATED'} (${risk.alert_tier || 'ALERT'})`;
+                if (risk.risk_level === 'EXTREME' || risk.alert_tier === 'RED ALERT') {
+                    riskBadge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-600 font-mono animate-pulse";
+                } else if (risk.risk_level === 'HIGH' || risk.alert_tier === 'ORANGE ALERT') {
+                    riskBadge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-600 font-mono";
+                } else {
+                    riskBadge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-teal-950 text-teal-300 border border-teal-600 font-mono";
+                }
+            }
+            if (document.getElementById('gruRiskTarget')) {
+                document.getElementById('gruRiskTarget').innerText = `${risk.closest_coastal_target || 'Coast'} (${risk.min_coastal_distance_km || '--'} km)`;
+            }
+            if (document.getElementById('gruRiskAction')) {
+                document.getElementById('gruRiskAction').innerText = risk.recommended_action || 'Surveillance active.';
+            }
+
+            const factorsList = document.getElementById('gruRiskFactorsList');
+            if (factorsList && risk.factors) {
+                factorsList.innerHTML = risk.factors.map(f => `<div class="flex items-center gap-1.5"><span class="text-cyan-400">▸</span><span>${f}</span></div>`).join('');
+            }
+
+            // 4. Co-located Weather
+            const weather = data.weather_data || {};
+            if (document.getElementById('gruWeatherTemp')) {
+                document.getElementById('gruWeatherTemp').innerText = weather.temperature_c != null ? `${weather.temperature_c} °C` : '--';
+            }
+            if (document.getElementById('gruWeatherPres')) {
+                document.getElementById('gruWeatherPres').innerText = weather.surface_pressure_hpa != null ? `${weather.surface_pressure_hpa} hPa` : '--';
+            }
+            if (document.getElementById('gruWeatherWind')) {
+                document.getElementById('gruWeatherWind').innerText = weather.wind_speed_kmh != null ? `${weather.wind_speed_kmh} km/h` : '--';
+            }
+
+            // 5. Prediction Horizon Table
+            const tableBody = document.getElementById('gruPredictionTableBody');
+            if (tableBody && data.gru_predicted_track) {
+                tableBody.innerHTML = data.gru_predicted_track.map(p => `
+                    <tr class="hover:bg-slate-900/50 transition">
+                        <td class="p-1.5 font-bold text-cyan-300">Step ${p.step}</td>
+                        <td class="p-1.5 text-white">${p.latitude}°N</td>
+                        <td class="p-1.5 text-white">${p.longitude}°E</td>
+                        <td class="p-1.5 text-teal-400">± ${p.uncertainty_radius_km} km</td>
+                        <td class="p-1.5 text-amber-300">${p.lead_hours}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // 6. XAI / Empirical Feature Importance
+            const xai = data.ai_explanation || {};
+            if (document.getElementById('gruXaiRationale')) {
+                document.getElementById('gruXaiRationale').innerText = xai.synoptic_rationale || 'Recurrent temporal trajectory analysis.';
+            }
+
+            const barsGrid = document.getElementById('gruFeatureBarsGrid');
+            if (barsGrid && xai.feature_importance_pct) {
+                const colors = {
+                    'LON': 'bg-cyan-500',
+                    'LAT': 'bg-blue-500',
+                    'DELTA_LON': 'bg-teal-500',
+                    'DELTA_LAT': 'bg-emerald-500',
+                    'WIND': 'bg-amber-500',
+                    'PRES': 'bg-rose-500',
+                    'MONTH_SIN': 'bg-purple-500',
+                    'MONTH_COS': 'bg-indigo-500'
+                };
+                barsGrid.innerHTML = Object.entries(xai.feature_importance_pct).map(([feat, pct]) => `
+                    <div class="bg-slate-950 p-1.5 rounded border border-slate-800 space-y-1">
+                        <div class="flex justify-between text-[9px] text-slate-300">
+                            <span>${feat}</span>
+                            <b class="text-white">${pct}%</b>
+                        </div>
+                        <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                            <div class="${colors[feat] || 'bg-cyan-500'} h-full rounded-full" style="width: ${Math.min(100, pct * 1.8)}%"></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // 7. Render on Geospatial Leaflet Map
+            renderGruOnMap(data);
+        }
+
+        function renderGruOnMap(data) {
+            if (!map) return;
+
+            // Clear previous GRU layers
+            if (gruTrackPolyline) map.removeLayer(gruTrackPolyline);
+            if (gruForecastPolyline) map.removeLayer(gruForecastPolyline);
+            gruMarkers.forEach(m => map.removeLayer(m));
+            gruMarkers = [];
+
+            const hist = data.historical_track || [];
+            const preds = data.gru_predicted_track || [];
+            const cur = data.current_cyclone_position || {};
+
+            const latLngsAll = [];
+
+            // Draw historical track (Cyan solid polyline)
+            if (hist.length > 0) {
+                const histPoints = hist.map(h => [h.latitude, h.longitude]);
+                histPoints.forEach(pt => latLngsAll.push(pt));
+
+                gruTrackPolyline = L.polyline(histPoints, {
+                    color: '#06b6d4',
+                    weight: 3,
+                    opacity: 0.85
+                }).addTo(map);
+
+                hist.forEach((h) => {
+                    const mk = L.circleMarker([h.latitude, h.longitude], {
+                        radius: 4,
+                        color: '#06b6d4',
+                        fillColor: '#0891b2',
+                        fillOpacity: 0.8
+                    }).addTo(map).bindPopup(`<b>Historical Step ${h.step}</b><br>${h.latitude}°N, ${h.longitude}°E<br>${h.wind_kts} kts | ${h.pressure_hpa} hPa`);
+                    gruMarkers.push(mk);
+                });
+            }
+
+            // Current position marker (Pulsing Rose circle)
+            if (cur.latitude && cur.longitude) {
+                const curPos = [cur.latitude, cur.longitude];
+                latLngsAll.push(curPos);
+
+                const curMk = L.circleMarker(curPos, {
+                    radius: 10,
+                    color: '#f43f5e',
+                    fillColor: '#f43f5e',
+                    fillOpacity: 0.95,
+                    weight: 3
+                }).addTo(map).bindPopup(`<b>${data.storm_name} (Current Observation)</b><br>Lat: ${cur.latitude}°N, Lon: ${cur.longitude}°E<br>Wind: ${cur.wind_kts} kts | Pressure: ${cur.pressure_hpa} hPa<br><b class="text-rose-500">${data.risk_assessment ? data.risk_assessment.alert_tier : 'ACTIVE'}</b>`);
+                gruMarkers.push(curMk);
+            }
+
+            // Draw GRU predicted forecast track (Magenta/Rose dashed polyline)
+            if (preds.length > 0) {
+                const forecastPts = [];
+                if (cur.latitude && cur.longitude) {
+                    forecastPts.push([cur.latitude, cur.longitude]);
+                }
+                preds.forEach(p => {
+                    const pt = [p.latitude, p.longitude];
+                    forecastPts.push(pt);
+                    latLngsAll.push(pt);
+
+                    // Add forecast marker
+                    const fMk = L.circleMarker(pt, {
+                        radius: 6,
+                        color: '#ec4899',
+                        fillColor: '#f43f5e',
+                        fillOpacity: 0.9,
+                        weight: 2
+                    }).addTo(map).bindPopup(`<b>GRU Forecast ${p.lead_hours} (Step ${p.step})</b><br>${p.latitude}°N, ${p.longitude}°E<br>Uncertainty Radius: ±${p.uncertainty_radius_km} km`);
+                    gruMarkers.push(fMk);
+
+                    // Add uncertainty circle
+                    const cone = L.circle(pt, {
+                        radius: p.uncertainty_radius_km * 1000,
+                        color: '#ec4899',
+                        weight: 1,
+                        dashArray: '4, 4',
+                        fillColor: '#f43f5e',
+                        fillOpacity: 0.08
+                    }).addTo(map);
+                    gruMarkers.push(cone);
+                });
+
+                gruForecastPolyline = L.polyline(forecastPts, {
+                    color: '#ec4899',
+                    weight: 3,
+                    dashArray: '6, 6'
+                }).addTo(map);
+            }
+
+            if (latLngsAll.length > 0) {
+                map.fitBounds(latLngsAll, { padding: [40, 40] });
+            }
+        }
+
+        // -------------------------------------------------------------
         // Multi-Tool Deck Tab Switching
         // -------------------------------------------------------------
         function switchDeckTab(tabId) {
@@ -759,6 +1190,7 @@
             if (target) target.classList.remove('hidden');
 
             const btnMap = {
+                'tabGruTrajectory': 'btnTabGruTrajectory',
                 'tabWhatIf': 'btnTabWhatIf',
                 'tabYoloUpload': 'btnTabYoloUpload',
                 'tabLocationRisk': 'btnTabLocationRisk',

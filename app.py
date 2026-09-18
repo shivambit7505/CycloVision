@@ -1,7 +1,11 @@
 import os
 import math
-from typing import Optional, List, Dict
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -24,6 +28,7 @@ from v2.gis.geodesic_radar import haversine_distance_km, compute_wind_radii, eva
 from external_service import ExternalIntelligenceService
 from v2.services.weather_service import get_weather_provider
 from v2.services.satellite_service import validate_and_process_satellite_image, get_satellite_sources_status
+from v2.services.trajectory_fusion_service import get_trajectory_fusion_service
 from v2.db.database import get_satellite_images
 
 ext_service = ExternalIntelligenceService()
@@ -32,6 +37,15 @@ app = FastAPI(
     title="CycloVision AI",
     description="Authoritative Tropical Cyclone Decision Support System",
     version="2.1.0"
+)
+
+# Enable CORS for all origins, methods, and headers
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -94,55 +108,82 @@ def api_data_status():
         "qc_status": "ALL_FEEDS_HEALTHY"
     }
 
-@app.post("/api/analyze")
-def analyze_cyclone(req: CycloneAnalysisRequest):
-    pred = predict_cyclone_v2(t_number=req.simulated_intensity, sst=30.0, vws=7.5, lat=req.center_lat, lon=req.center_lon)
-    wind_kmph = pred['intensity']['value']
-    wind_kts = round(wind_kmph / 1.852, 1)
-    pressure = pred['pressure']['value']
-    
-    # Swin-ConvLSTM Spatiotemporal Sequence Forecast Engine
-    trajectory = forecast_with_swin_convlstm(req.center_lat, req.center_lon, wind_kts, sst=30.0, vws=7.5)
-    geo_sector = ext_service.reverse_geocode_coordinates(req.center_lat, req.center_lon)
+class UnifiedAnalyzeRequest(BaseModel):
+    storm_id: Optional[str] = Field(default=None)
+    observations: Optional[List[Dict[str, Any]]] = Field(default=None)
+    use_demo_mode: bool = Field(default=False)
+    steps: int = Field(default=6, ge=1, le=6)
+    include_weather: bool = Field(default=True)
+    basin: Optional[str] = Field(default="Bay of Bengal")
+    simulated_intensity: Optional[float] = Field(default=4.5)
+    center_lat: Optional[float] = Field(default=None)
+    center_lon: Optional[float] = Field(default=None)
 
-    return {
-        "storm_metadata": {
-            "system_name": "CYCLONE-X (BOB-02)",
-            "basin": req.basin,
-            "geographical_jurisdiction": geo_sector,
-            "imd_stage": pred['stage'],
-            "imd_stage_code": pred['stage_code'],
-            "estimated_wind_knots": wind_kts,
-            "estimated_wind_kmph": wind_kmph,
-            "central_pressure_hpa": pressure,
-            "pressure_deficit_hpa": round(1010.0 - pressure, 1),
-            "alert_level": "RED" if wind_kmph >= 118 else "ORANGE" if wind_kmph >= 88 else "YELLOW",
-            "current_center": {"lat": req.center_lat, "lon": req.center_lon}
-        },
-        "rapid_intensification": {
-            "ri_probability": pred['rapid_intensification']['probability'],
-            "status": pred['rapid_intensification']['status'],
-            "reasoning": f"SST ({pred['rapid_intensification']['features']['sst']}) coupled with low shear triggers favorable thermodynamic RI window."
-        },
-        "landfall_risk": {
-            "vulnerable_districts": [
-                {"district": "Puri", "surge_m": 3.8, "pop_exposure": "1.7M", "risk": "CRITICAL"},
-                {"district": "Jagatsinghpur", "surge_m": 3.4, "pop_exposure": "1.1M", "risk": "CRITICAL"},
-                {"district": "Ganjam", "surge_m": 2.6, "pop_exposure": "2.4M", "risk": "HIGH"}
-            ],
-            "ndma_alert_sms": "MoES/IMD RED ALERT: Move immediately to concrete cyclone shelters. Total fishing ban."
-        },
-        "trajectory_forecast": trajectory,
-        "top_historical_analogs": [
-            {"cyclone_name": "Cyclone Fani", "year": 2019, "similarity_score_pct": 92.4, "historical_peak_wind_knots": 115, "landfall_location": "Puri, Odisha"},
-            {"cyclone_name": "Cyclone Phailin", "year": 2013, "similarity_score_pct": 86.1, "historical_peak_wind_knots": 115, "landfall_location": "Gopalpur, Odisha"}
-        ],
-        "gemini_ai_reasoning": "High Sea Surface Temperature (>30°C) coupled with low vertical wind shear (<10 kts) is supplying continuous moist enthalpy.",
-        "ensemble_models": {"dvorak_cnn": wind_kts, "atkinson_holliday": wind_kts + 2.0, "physics_bound": wind_kts - 1.5},
-        "explainable_ai": {"saliency_focus": "Central Dense Overcast Eyewall", "confidence": 0.89},
-        "cyclogenesis_watch": {"active_disturbances": 1, "potential": "MODERATE_TO_HIGH"},
-        "reliability_telemetry": {"latency_ms": 42, "uptime": "99.98%"}
+@app.post("/api/analyze")
+def api_analyze_main(req: UnifiedAnalyzeRequest):
+    """
+    Main Data Fusion & Analysis Engine:
+    cyclone observations -> data fusion -> GRU prediction -> risk assessment -> dashboard.
+    """
+    fusion = get_trajectory_fusion_service()
+    
+    has_obs = req.observations is not None and len(req.observations) > 0
+    use_demo = req.use_demo_mode or (not has_obs and req.center_lat is None)
+    
+    if has_obs or use_demo or (req.center_lat is None and req.center_lon is None):
+        fusion_res = fusion.analyze_cyclone(
+            storm_id=req.storm_id,
+            observations=req.observations,
+            use_demo_mode=use_demo,
+            steps=req.steps,
+            include_weather=req.include_weather
+        )
+    else:
+        lat = req.center_lat
+        lon = req.center_lon
+        sim_obs = [
+            {"latitude": lat - 1.5, "longitude": lon + 1.2, "wind_speed": 45, "pressure": 995, "month": 5},
+            {"latitude": lat - 1.0, "longitude": lon + 0.8, "wind_speed": 60, "pressure": 985, "month": 5},
+            {"latitude": lat - 0.5, "longitude": lon + 0.4, "wind_speed": 80, "pressure": 970, "month": 5},
+            {"latitude": lat, "longitude": lon, "wind_speed": 115, "pressure": 932, "month": 5}
+        ]
+        fusion_res = fusion.analyze_cyclone(
+            storm_id=req.storm_id,
+            observations=sim_obs,
+            use_demo_mode=False,
+            steps=req.steps,
+            include_weather=req.include_weather
+        )
+    
+    # Backward compatibility enrichment:
+    wind_kmph = fusion_res["current_cyclone_position"]["wind_kmph"]
+    wind_kts = fusion_res["current_cyclone_position"]["wind_kts"]
+    pressure = fusion_res["current_cyclone_position"]["pressure_hpa"]
+    c_lat = fusion_res["current_cyclone_position"]["latitude"]
+    c_lon = fusion_res["current_cyclone_position"]["longitude"]
+    geo_sector = ext_service.reverse_geocode_coordinates(c_lat, c_lon)
+    
+    fusion_res["storm_metadata"] = {
+        "system_name": fusion_res["storm_name"],
+        "basin": req.basin or "Bay of Bengal",
+        "geographical_jurisdiction": geo_sector,
+        "imd_stage": fusion_res["current_cyclone_position"]["stage"],
+        "estimated_wind_knots": wind_kts,
+        "estimated_wind_kmph": wind_kmph,
+        "central_pressure_hpa": pressure,
+        "alert_level": fusion_res["risk_assessment"]["alert_tier"],
+        "current_center": {"lat": c_lat, "lon": c_lon}
     }
+    fusion_res["trajectory_forecast"] = [
+        {"lead_hour": p["step"] * 6, "latitude": p["latitude"], "longitude": p["longitude"], "uncertainty_radius_km": p["uncertainty_radius_km"]}
+        for p in fusion_res["gru_predicted_track"]
+    ]
+    fusion_res["landfall_risk"] = {
+        "closest_threat": fusion_res["risk_assessment"]["closest_coastal_target"],
+        "risk_level": fusion_res["risk_assessment"]["risk_level"],
+        "action": fusion_res["risk_assessment"]["recommended_action"]
+    }
+    return fusion_res
 
 @app.post("/api/satellite/upload")
 @app.post("/api/upload-satellite-image")
@@ -379,6 +420,93 @@ def api_get_historical_weather(lat: float = 19.8, lon: float = 85.8, start_date:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Historical weather archive unavailable: {e}")
+
+@app.get("/api/health")
+def api_health_check():
+    """
+    Health check endpoint reporting status of models, database, and weather service.
+    """
+    yolo_path = Path("models/yolo/best.pt")
+    gru_path = Path("models/trajectory/trajectory_model.keras")
+    scaler_path = Path("models/trajectory/scaler.pkl")
+    fani_demo_path = Path("reports/trajectory/test_prediction.json")
+    
+    return {
+        "status": "HEALTHY",
+        "service": "CycloVision AI Operational Core",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "models": {
+            "yolo_detector": {
+                "status": "LOADED" if yolo_path.exists() else "UNAVAILABLE",
+                "model_path": str(yolo_path),
+                "type": "Ultralytics YOLOv8n Fine-Tuned (LLCC & Eyewall)"
+            },
+            "gru_trajectory": {
+                "status": "LOADED" if gru_path.exists() and scaler_path.exists() else "UNAVAILABLE",
+                "model_path": str(gru_path),
+                "scaler_path": str(scaler_path),
+                "type": "2-Layer Recurrent Neural Network (GRU 64-32)"
+            }
+        },
+        "integrations": {
+            "weather_provider": "Open-Meteo REST Service",
+            "sqlite_ledger": "OPERATIONAL (WAL Mode)",
+            "demo_mode_ready": fani_demo_path.exists()
+        }
+    }
+
+class PredictTrajectoryRequest(BaseModel):
+    observations: Optional[List[Dict[str, Any]]] = Field(default=None)
+    storm_id: Optional[str] = Field(default=None)
+    steps: int = Field(default=6, ge=1, le=6)
+    use_demo: bool = Field(default=False)
+
+@app.post("/api/predict-trajectory")
+def api_predict_trajectory_standard(req: PredictTrajectoryRequest):
+    """
+    Standard GRU Trajectory Prediction API.
+    Accepts sequence of past observations or triggers DEMO MODE on historical Cyclone Fani data.
+    """
+    try:
+        fusion = get_trajectory_fusion_service()
+        res = fusion.analyze_cyclone(
+            storm_id=req.storm_id,
+            observations=req.observations,
+            use_demo_mode=req.use_demo or (not req.observations),
+            steps=req.steps,
+            include_weather=False
+        )
+        return {
+            "status": "SUCCESS",
+            "data_source_label": res["data_source_label"],
+            "is_demo": res["is_demo"],
+            "storm_name": res["storm_name"],
+            "prediction_points_count": res["prediction_points_count"],
+            "predictions": res["gru_predicted_track"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Trajectory prediction failed: {e}")
+
+@app.get("/api/trajectory/test-prediction")
+def api_get_test_trajectory():
+    test_file = Path("reports/trajectory/test_prediction.json")
+    if test_file.exists():
+        with open(test_file, "r") as f:
+            return json.load(f)
+    return {"error": "Test prediction not found"}
+
+class TrajectoryPredictRequest(BaseModel):
+    observations: List[Dict[str, Any]]
+    steps: int = Field(default=6, ge=1, le=6)
+
+@app.post("/api/trajectory/predict")
+def api_predict_trajectory(req: TrajectoryPredictRequest):
+    try:
+        from ml.trajectory.predict import TrajectoryPredictor
+        predictor = TrajectoryPredictor()
+        return predictor.predict(req.observations, steps=req.steps)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
