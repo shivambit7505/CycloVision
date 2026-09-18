@@ -6,6 +6,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background: #070c18; color: #f8fafc; }
@@ -42,6 +43,9 @@
             </button>
             <button onclick="triggerEmailAlert()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition">
                 <span>📧</span> <span>Email</span>
+            </button>
+            <button onclick="openArchitectureModal()" class="bg-cyan-900/80 hover:bg-cyan-800 text-cyan-200 border border-cyan-700/60 font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1 transition">
+                <span>📐</span> <span>Architecture</span>
             </button>
             <div class="flex items-center gap-1 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
                 <span class="text-slate-400">Storm:</span>
@@ -98,6 +102,19 @@
                     <div class="flex justify-between"><span class="text-slate-400">Intensity MAE:</span> <b class="text-cyan-300 font-mono">6.8 kt</b></div>
                     <div class="flex justify-between"><span class="text-slate-400">Track Error 24h:</span> <b class="text-emerald-400 font-mono">42.1 km (IMD: 75km)</b></div>
                     <div class="flex justify-between"><span class="text-slate-400">RI ROC-AUC:</span> <b class="text-rose-400 font-mono">0.89</b></div>
+                </div>
+            </div>
+
+            <!-- 3D Vortex Simulation Card (Three.js) -->
+            <div class="panel p-3.5 space-y-2 text-xs border-cyan-900/50">
+                <div class="font-bold uppercase tracking-wider text-cyan-400 flex items-center justify-between">
+                    <span>🌀 3D Vortex Simulation</span>
+                    <span class="text-[10px] font-mono text-emerald-400">Three.js</span>
+                </div>
+                <div id="vortexCanvasContainer" class="w-full h-32 rounded-lg bg-slate-950/80 border border-slate-800 overflow-hidden relative flex items-center justify-center"></div>
+                <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>Inflow Spirals: Active</span>
+                    <span class="text-cyan-300">Angular Velocity: 0.02 rad/f</span>
                 </div>
             </div>
         </div>
@@ -348,7 +365,125 @@ Advisory: Total deep-sea fishing suspension. Coastal evacuation in progress.`;
             }
         }
 
-        window.onload = initV2Map;
+        function openArchitectureModal() {
+            const modal = document.getElementById('architectureModal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeArchitectureModal() {
+            const modal = document.getElementById('architectureModal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function initThreeVortex() {
+            const container = document.getElementById('vortexCanvasContainer');
+            if (!container || typeof THREE === 'undefined') return;
+
+            const scene = new THREE.Scene();
+            const width = container.clientWidth || 280;
+            const height = container.clientHeight || 128;
+            const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+            camera.position.set(0, 14, 22);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.innerHTML = '';
+            container.appendChild(renderer.domElement);
+
+            const particleCount = 1800;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                const radius = Math.pow(Math.random(), 2) * 12 + 1.0;
+                const spinAngle = radius * 2.6;
+                const branchAngle = ((i % 3) * 2 * Math.PI) / 3;
+
+                const randomX = (Math.random() - 0.5) * 0.4;
+                const randomY = (Math.random() - 0.5) * 1.2 - (12 - radius) * 0.12;
+                const randomZ = (Math.random() - 0.5) * 0.4;
+
+                positions[i3] = Math.cos(branchAngle + spinAngle) * radius + randomX;
+                positions[i3 + 1] = randomY;
+                positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * radius + randomZ;
+
+                if (radius < 2.8) {
+                    colors[i3] = 0.95; colors[i3 + 1] = 0.25; colors[i3 + 2] = 0.3;
+                } else if (radius < 6.5) {
+                    colors[i3] = 0.2; colors[i3 + 1] = 0.85; colors[i3 + 2] = 0.95;
+                } else {
+                    colors[i3] = 0.1; colors[i3 + 1] = 0.45; colors[i3 + 2] = 0.85;
+                }
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 0.25,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.85
+            });
+
+            const vortexMesh = new THREE.Points(geometry, material);
+            scene.add(vortexMesh);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                vortexMesh.rotation.y -= 0.018;
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                if (!container || !renderer) return;
+                const newW = container.clientWidth;
+                const newH = container.clientHeight;
+                camera.aspect = newW / newH;
+                camera.updateProjectionMatrix();
+                renderer.setSize(newW, newH);
+            });
+        }
+
+        window.onload = () => {
+            initV2Map();
+            initThreeVortex();
+        };
     </script>
+
+    <!-- 5-Layer Architecture Modal (ReportLab PDF / PNG Render) -->
+    <div id="architectureModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="panel max-w-4xl w-full max-h-[90vh] overflow-y-auto p-5 space-y-4 border-cyan-500/40 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div>
+                    <h2 class="text-sm font-black text-white flex items-center gap-2">
+                        <span>📐</span> CYCLOVISION AI — 5-LAYER SYSTEM ARCHITECTURE
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Authoritative High-Level Design Contract (MoES / IMD SIH26070)</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <a href="/static/CycloVision_Architecture.pdf" target="_blank" download class="bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow">
+                        <span>⬇️</span> Download PDF
+                    </a>
+                    <button onclick="closeArchitectureModal()" class="text-slate-400 hover:text-white text-lg font-bold px-2 py-1">✕</button>
+                </div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-center shadow-inner">
+                <img src="/static/architecture.png" alt="CycloVision AI System Architecture" class="max-w-full h-auto rounded-lg shadow-2xl border border-slate-700/50">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-[10px] font-mono text-slate-400 pt-2 border-t border-slate-800">
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-indigo-300 block mb-1">Presentation:</b> Next.js 14, Three.js 3D Vortex, Recharts</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-emerald-300 block mb-1">Application:</b> FastAPI, Uvicorn Gateway, State Controller</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-amber-300 block mb-1">Business Logic:</b> YOLOv8 LLCC, Swin-ConvLSTM, Haversine Radar</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-cyan-300 block mb-1">Storage:</b> NOAA IBTrACS, INSAT Raster, Municipal GIS</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-rose-300 block mb-1">External:</b> Open-Meteo, Geocoding, MOSDAC, NDMA SOS</div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

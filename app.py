@@ -18,6 +18,12 @@ from auto_sentinel import (
 )
 from v2.api.routes import v2_router
 from v2.db import database
+from v2.models.yolov8_detector import detect_cyclone_center
+from v2.models.swin_convlstm import forecast_with_swin_convlstm
+from v2.gis.geodesic_radar import haversine_distance_km, compute_wind_radii, evaluate_shelter_risk
+from external_service import ExternalIntelligenceService
+
+ext_service = ExternalIntelligenceService()
 
 app = FastAPI(
     title="CycloVision AI",
@@ -92,21 +98,15 @@ def analyze_cyclone(req: CycloneAnalysisRequest):
     wind_kts = round(wind_kmph / 1.852, 1)
     pressure = pred['pressure']['value']
     
-    trajectory = []
-    for h in [6, 12, 24, 48]:
-        d_lat = (14.0 * h * math.cos(math.radians(330))) / 111.0
-        d_lon = (14.0 * h * math.sin(math.radians(330))) / (111.0 * math.cos(math.radians(req.center_lat)))
-        trajectory.append({
-            "lead_hour": h,
-            "latitude": round(req.center_lat + d_lat, 2),
-            "longitude": round(req.center_lon + d_lon, 2),
-            "uncertainty_cone_radius_km": 20.0 + h * 1.5
-        })
+    # Swin-ConvLSTM Spatiotemporal Sequence Forecast Engine
+    trajectory = forecast_with_swin_convlstm(req.center_lat, req.center_lon, wind_kts, sst=30.0, vws=7.5)
+    geo_sector = ext_service.reverse_geocode_coordinates(req.center_lat, req.center_lon)
 
     return {
         "storm_metadata": {
             "system_name": "CYCLONE-X (BOB-02)",
             "basin": req.basin,
+            "geographical_jurisdiction": geo_sector,
             "imd_stage": pred['stage'],
             "imd_stage_code": pred['stage_code'],
             "estimated_wind_knots": wind_kts,
@@ -162,20 +162,20 @@ async def upload_satellite_image(file: UploadFile = File(...)):
     finally:
         await file.close()
 
-    # Deep CNN Low-Level Circulation Center (LLCC) detection on satellite crop
-    detected_x, detected_y = 128, 134
-    computed_t = 5.0
-    wind_kts = round(23.0 * (computed_t ** 0.95), 1)
-    wind_kmph = round(wind_kts * 1.852, 1)
+    # YOLOv8 Low-Level Circulation Center (LLCC) detection engine
+    detection_res = detect_cyclone_center(contents)
+    computed_t = detection_res["dvorak_t_number"]
+    wind_kts = detection_res["estimated_wind_knots"]
+    wind_kmph = detection_res["estimated_wind_kmph"]
     
     return {
         "status": "PROCESSED",
         "filename": filename,
-        "detection": {"detected_center": {"x": detected_x, "y": detected_y}, "confidence": 0.94},
+        "detection": detection_res,
         "dvorak_t_number": computed_t,
         "estimated_wind_knots": wind_kts,
         "estimated_wind_kmph": wind_kmph,
-        "imd_stage": "Very Severe Cyclonic Storm (VSCS)"
+        "imd_stage": "Very Severe Cyclonic Storm (VSCS)" if wind_kmph >= 118 else "Severe Cyclonic Storm (SCS)"
     }
 
 @app.post("/api/send-telegram-alert")
@@ -227,12 +227,66 @@ def simulate_what_if(req: WhatIfRequest):
 @app.post("/api/location-risk")
 @app.post("/api/check-location-risk")
 def check_location_risk(req: LocationRiskRequest):
+    city_coords = {
+        "Visakhapatnam": (17.6868, 83.2185),
+        "Puri": (19.8135, 85.8312),
+        "Bhubaneswar": (20.2961, 85.8245),
+        "Kolkata": (22.5726, 88.3639),
+        "Chennai": (13.0827, 80.2707)
+    }
+    c_lat, c_lon = city_coords.get(req.city_name, (17.6868, 83.2185))
+    dist_km = haversine_distance_km(req.storm_lat, req.storm_lon, c_lat, c_lon)
+    
+    municipal_shelters = [
+        {"name": "Shelter-04 (Beach Road)", "district": req.city_name, "lat": c_lat + 0.02, "lon": c_lon + 0.01, "capacity": 2500},
+        {"name": "Shelter-12 (Zilla Parishad High School)", "district": req.city_name, "lat": c_lat - 0.03, "lon": c_lon - 0.02, "capacity": 1800}
+    ]
+    shelter_eval = evaluate_shelter_risk(req.storm_lat, req.storm_lon, req.storm_wind_kmph, municipal_shelters)
+    radii = compute_wind_radii(req.storm_wind_kmph / 1.852)
+
     return {
         "city_name": req.city_name,
-        "current_risk": "HIGH_SURGE_AND_GALE",
-        "distance_to_center_km": 112.5,
-        "nearest_cyclone_shelters": ["Shelter-04 (Beach Road)", "Shelter-12 (Zilla Parishad High School)"]
+        "distance_to_center_km": dist_km,
+        "current_risk": "HIGH_SURGE_AND_GALE" if dist_km <= radii["r34_gale_radius_km"] else "MODERATE_COASTAL_ALERT",
+        "wind_radii": radii,
+        "nearest_cyclone_shelters": [s["shelter_name"] for s in shelter_eval],
+        "shelter_evaluations": shelter_eval
     }
+
+@app.get("/api/external/open-meteo")
+def get_open_meteo_telemetry(lat: float = 16.2, lon: float = 84.6):
+    return ext_service.fetch_open_meteo_atmospheric_profile(lat, lon)
+
+@app.get("/api/external/mosdac-status")
+def get_mosdac_status():
+    return ext_service.verify_mosdac_feed_status()
+
+@app.get("/api/radar/sweep")
+def get_radar_sweep(lat: float = 16.2, lon: float = 84.6, wind_kmph: float = 165.0):
+    wind_kts = wind_kmph / 1.852
+    radii = compute_wind_radii(wind_kts)
+    return {
+        "center": {"lat": lat, "lon": lon},
+        "wind_kmph": wind_kmph,
+        "wind_radii": radii,
+        "radar_mode": "GEODESIC_HAVERSINE_SPHERICAL"
+    }
+
+@app.get("/api/architecture")
+def get_architecture():
+    return {
+        "title": "CycloVision AI - Authoritative 5-Layer Architecture",
+        "layers": {
+            "presentation": ["Next.js 14 App Router", "Three.js & R3F (3D Vortex)", "Recharts & Tailwind CSS"],
+            "application": ["FastAPI Backend (Python)", "API Gateway (Uvicorn/CORS)", "Client State Controller"],
+            "business_logic": ["YOLOv8 Center Detection", "Swin-ConvLSTM Prediction Engine", "Geodesic Radar (Haversine Engine)"],
+            "data_storage": ["NOAA IBTrACS Archive", "INSAT-3DS Raster Cache", "Municipal GIS Database (SQLite/WAL)"],
+            "external_services": ["Open-Meteo API", "Geocoding Service", "ISRO MOSDAC Feeds", "NDMA SOS Broadcast", "Netlify Global CDN"]
+        },
+        "diagram_image": "/static/architecture.png",
+        "diagram_pdf": "/static/CycloVision_Architecture.pdf"
+    }
+
 
 @app.get("/api/historical-replay/{storm_id}")
 def get_historical_replay(storm_id: str):
