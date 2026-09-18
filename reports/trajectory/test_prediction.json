@@ -1,0 +1,176 @@
+{
+  "storm_id": "2019116N02090",
+  "storm_name": "FANI",
+  "evaluation_type": "Validation Cyclone Trajectory Forecast",
+  "past_track_input_6_steps": [
+    {
+      "iso_time": "2019-04-27 00:00:00",
+      "latitude": 4.6,
+      "longitude": 89.4,
+      "wind_speed": 30.0,
+      "pressure": 997.0,
+      "month": 4
+    },
+    {
+      "iso_time": "2019-04-27 03:00:00",
+      "latitude": 4.9,
+      "longitude": 89.4,
+      "wind_speed": 30.0,
+      "pressure": 996.0,
+      "month": 4
+    },
+    {
+      "iso_time": "2019-04-27 06:00:00",
+      "latitude": 5.1,
+      "longitude": 89.4,
+      "wind_speed": 35.0,
+      "pressure": 995.0,
+      "month": 4
+    },
+    {
+      "iso_time": "2019-04-27 09:00:00",
+      "latitude": 5.5,
+      "longitude": 89.3,
+      "wind_speed": 40.0,
+      "pressure": 994.0,
+      "month": 4
+    },
+    {
+      "iso_time": "2019-04-27 12:00:00",
+      "latitude": 6.0,
+      "longitude": 89.2,
+      "wind_speed": 45.0,
+      "pressure": 992.0,
+      "month": 4
+    },
+    {
+      "iso_time": "2019-04-27 15:00:00",
+      "latitude": 6.4,
+      "longitude": 88.9,
+      "wind_speed": 45.0,
+      "pressure": 992.0,
+      "month": 4
+    }
+  ],
+  "predicted_track_6_steps": [
+    {
+      "step": 1,
+      "latitude": 6.8762,
+      "longitude": 88.6526
+    },
+    {
+      "step": 2,
+      "latitude": 7.1318,
+      "longitude": 88.3676
+    },
+    {
+      "step": 3,
+      "latitude": 7.5666,
+      "longitude": 88.2029
+    },
+    {
+      "step": 4,
+      "latitude": 7.9064,
+      "longitude": 88.0852
+    },
+    {
+      "step": 5,
+      "latitude": 8.2066,
+      "longitude": 88.066
+    },
+    {
+      "step": 6,
+      "latitude": 8.5563,
+      "longitude": 87.8929
+    }
+  ],
+  "ground_truth_future_6_steps": [
+    {
+      "step": 1,
+      "iso_time": "2019-04-27 18:00:00",
+      "latitude": 6.6,
+      "longitude": 88.5
+    },
+    {
+      "step": 2,
+      "iso_time": "2019-04-27 21:00:00",
+      "latitude": 6.8,
+      "longitude": 88.2
+    },
+    {
+      "step": 3,
+      "iso_time": "2019-04-28 00:00:00",
+      "latitude": 7.1,
+      "longitude": 88.1
+    },
+    {
+      "step": 4,
+      "iso_time": "2019-04-28 03:00:00",
+      "latitude": 7.2,
+      "longitude": 88.1
+    },
+    {
+      "step": 5,
+      "iso_time": "2019-04-28 06:00:00",
+      "latitude": 7.4,
+      "longitude": 88.1
+    },
+    {
+      "step": 6,
+      "iso_time": "2019-04-28 09:00:00",
+      "latitude": 7.6,
+      "longitude": 87.9
+    }
+  ],
+  "step_by_step_comparison": [
+    {
+      "step": 1,
+      "predicted_lat": 6.8762,
+      "predicted_lon": 88.6526,
+      "actual_lat": 6.6,
+      "actual_lon": 88.5,
+      "error_km": 35.03
+    },
+    {
+      "step": 2,
+      "predicted_lat": 7.1318,
+      "predicted_lon": 88.3676,
+      "actual_lat": 6.8,
+      "actual_lon": 88.2,
+      "error_km": 41.27
+    },
+    {
+      "step": 3,
+      "predicted_lat": 7.5666,
+      "predicted_lon": 88.2029,
+      "actual_lat": 7.1,
+      "actual_lon": 88.1,
+      "error_km": 53.11
+    },
+    {
+      "step": 4,
+      "predicted_lat": 7.9064,
+      "predicted_lon": 88.0852,
+      "actual_lat": 7.2,
+      "actual_lon": 88.1,
+      "error_km": 78.57
+    },
+    {
+      "step": 5,
+      "predicted_lat": 8.2066,
+      "predicted_lon": 88.066,
+      "actual_lat": 7.4,
+      "actual_lon": 88.1,
+      "error_km": 89.77
+    },
+    {
+      "step": 6,
+      "predicted_lat": 8.5563,
+      "predicted_lon": 87.8929,
+      "actual_lat": 7.6,
+      "actual_lon": 87.9,
+      "error_km": 106.34
+    }
+  ],
+  "mean_displacement_error_km": 67.35
+}

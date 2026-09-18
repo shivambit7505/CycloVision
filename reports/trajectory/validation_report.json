@@ -1,0 +1,18 @@
+{
+  "model_file": "models\\trajectory\\trajectory_model.keras",
+  "validation_cyclones_count": 314,
+  "validation_sequences_count": 7427,
+  "validation_loss_scaled_mse": 0.004533,
+  "latitude_mae_deg": 0.2621,
+  "longitude_mae_deg": 0.3814,
+  "overall_mean_position_error_km": 54.71,
+  "overall_median_position_error_km": 37.84,
+  "horizon_step_errors_km": {
+    "step_1": 21.46,
+    "step_2": 28.99,
+    "step_3": 43.41,
+    "step_4": 60.07,
+    "step_5": 77.71,
+    "step_6": 96.59
+  }
+}

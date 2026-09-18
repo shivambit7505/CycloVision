@@ -26,6 +26,7 @@ static/uploads/
 
 v2/data/*.txt
 latest_email_alert.txt
+data/ibtracs/*.csv
 
 # OS files
 .DS_Store

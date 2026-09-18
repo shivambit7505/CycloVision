@@ -1,0 +1,32 @@
+{
+  "model_type": "GRU",
+  "framework": "Keras 3.15.1 (PyTorch Backend)",
+  "hardware": "CPU (12 threads)",
+  "input_seq_len": 6,
+  "output_seq_len": 6,
+  "num_features": 8,
+  "features": [
+    "LAT",
+    "LON",
+    "DELTA_LAT",
+    "DELTA_LON",
+    "WIND",
+    "PRES",
+    "MONTH_SIN",
+    "MONTH_COS"
+  ],
+  "target_cols": [
+    "LAT",
+    "LON"
+  ],
+  "train_cyclones_count": 1260,
+  "val_cyclones_count": 314,
+  "train_sequences_count": 31314,
+  "val_sequences_count": 7427,
+  "training_time_seconds": 83.43,
+  "final_train_loss": 0.005262,
+  "final_val_loss": 0.004534,
+  "final_val_mae": 0.043994,
+  "model_file": "trajectory_model.keras",
+  "scaler_file": "scaler.pkl"
+}
