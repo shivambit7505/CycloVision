@@ -85,7 +85,8 @@ def train():
     weights_path = PRETRAINED_WEIGHTS if os.path.exists(PRETRAINED_WEIGHTS) else 'yolov8n.pt'
     print(f"[MODEL] Loading pretrained weights for transfer learning: {weights_path}")
     model = YOLO(weights_path)
-    print(f"[TRAINING] Commencing transfer learning (epochs={hw['epochs']}, imgsz={hw['imgsz']}, batch={hw['batch']})...")
+    import time
+    start_time = time.time()
     results = model.train(
         data=DATASET_YAML,
         epochs=hw['epochs'],
@@ -99,6 +100,7 @@ def train():
         exist_ok=True,
         verbose=True
     )
+    training_duration_sec = round(time.time() - start_time, 2)
     save_dir = results.save_dir if hasattr(results, 'save_dir') else os.path.join(OUTPUT_REPORT_DIR, 'train_run')
     best_weights_src = os.path.join(save_dir, 'weights', 'best.pt')
     last_weights_src = os.path.join(save_dir, 'weights', 'last.pt')
@@ -110,17 +112,37 @@ def train():
     if os.path.exists(last_weights_src):
         shutil.copy(last_weights_src, last_weights_dst)
         print(f"[SAVED] Last model checkpoint saved to: {last_weights_dst}")
+        
+    # Read final validation loss from results.csv if present
+    val_loss = None
+    csv_path = os.path.join(save_dir, 'results.csv')
+    if os.path.exists(csv_path):
+        try:
+            import pandas as pd
+            df = pd.read_csv(csv_path)
+            df.columns = [c.strip() for c in df.columns]
+            last_row = df.iloc[-1]
+            val_loss = {
+                'val_box_loss': round(float(last_row.get('val/box_loss', 0.0)), 4),
+                'val_cls_loss': round(float(last_row.get('val/cls_loss', 0.0)), 4),
+                'val_dfl_loss': round(float(last_row.get('val/dfl_loss', 0.0)), 4)
+            }
+        except Exception as e:
+            val_loss = str(e)
+
     summary = {
         'hardware': hw['hardware'],
         'imgsz': hw['imgsz'],
         'epochs': hw['epochs'],
         'batch': hw['batch'],
+        'training_time_seconds': training_duration_sec,
+        'val_loss': val_loss,
         'best_weights': best_weights_dst,
         'save_dir': str(save_dir)
     }
     with open(os.path.join(OUTPUT_REPORT_DIR, 'train_summary.json'), 'w') as f:
         json.dump(summary, f, indent=2)
-    print("\n[COMPLETED] Training pipeline completed successfully.")
+    print(f"\n[COMPLETED] Training finished in {training_duration_sec}s.")
     return summary
 
 if __name__ == '__main__':

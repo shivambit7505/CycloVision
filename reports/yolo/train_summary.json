@@ -3,6 +3,12 @@
   "imgsz": 320,
   "epochs": 8,
   "batch": 8,
+  "training_time_seconds": 44.73,
+  "val_loss": {
+    "val_box_loss": 0.3936,
+    "val_cls_loss": 1.866,
+    "val_dfl_loss": 0.8167
+  },
   "best_weights": "E:\\CycloVision\\models\\yolo\\best.pt",
   "save_dir": "E:\\CycloVision\\reports\\yolo\\train_run"
 }
