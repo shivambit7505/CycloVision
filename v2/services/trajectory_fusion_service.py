@@ -228,12 +228,36 @@ class TrajectoryFusionService:
         storm_name = "ACTIVE CYCLONE TARGET"
 
         if use_demo_mode or not observations or len(observations) == 0:
-            # Fallback to verified ground-truth Cyclone FANI historical dataset
-            demo_obj = self.get_demo_fani_data()
-            observations = demo_obj.get("past_track_input_6_steps", [])
-            storm_name = demo_obj.get("storm_name", "FANI (2019)")
-            is_demo = True
-            data_source_label = "DEMO / HISTORICAL DATA (NOAA IBTrACS Cyclone Fani)"
+            from v2.data.ibtracs_loader import get_storm_by_id
+            storm_record = get_storm_by_id(storm_id) if storm_id else None
+
+            if storm_record and storm_id in ["AMPHAN_2020", "BIPARJOY_2023"]:
+                storm_name = f"{storm_record['name']} ({storm_record['season']})"
+                observations = []
+                for ob in storm_record.get("observations", []):
+                    m = 5
+                    if "time" in ob:
+                        try:
+                            m = int(ob["time"].split("-")[1])
+                        except Exception:
+                            m = 5
+                    observations.append({
+                        "iso_time": ob.get("time", ""),
+                        "latitude": float(ob.get("lat", 0.0)),
+                        "longitude": float(ob.get("lon", 0.0)),
+                        "wind_speed": float(ob.get("wind_kts", 40.0)),
+                        "pressure": float(ob.get("pres", 995.0)),
+                        "month": m
+                    })
+                is_demo = True
+                data_source_label = f"DEMO / HISTORICAL DATA (NOAA IBTrACS Cyclone {storm_record['name']})"
+            else:
+                # Fallback to verified ground-truth Cyclone FANI historical dataset
+                demo_obj = self.get_demo_fani_data()
+                observations = demo_obj.get("past_track_input_6_steps", [])
+                storm_name = demo_obj.get("storm_name", "FANI (2019)")
+                is_demo = True
+                data_source_label = "DEMO / HISTORICAL DATA (NOAA IBTrACS Cyclone Fani)"
 
         if len(observations) == 0:
             raise ValueError("No cyclone observations available to analyze.")

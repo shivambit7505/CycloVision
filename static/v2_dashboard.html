@@ -106,7 +106,7 @@
                 <div class="flex justify-between items-center text-xs">
                     <span class="font-bold uppercase tracking-wider text-cyan-400">Current Storm Target</span>
                     <div class="flex items-center gap-1 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                        <select id="stormSelect" aria-label="Select Active or Historical Cyclone" onchange="loadV2Storm()" class="bg-transparent text-cyan-300 font-bold focus:outline-none cursor-pointer text-xs">
+                        <select id="stormSelect" aria-label="Select Active or Historical Cyclone" onchange="onStormSelectChange()" class="bg-transparent text-cyan-300 font-bold focus:outline-none cursor-pointer text-xs">
                             <option value="FANI_2019" class="bg-slate-900">Cyclone FANI (2019)</option>
                             <option value="AMPHAN_2020" class="bg-slate-900">Cyclone AMPHAN (2020)</option>
                             <option value="BIPARJOY_2023" class="bg-slate-900">Cyclone BIPARJOY (2023)</option>
@@ -853,6 +853,11 @@
             }
         }
 
+        async function onStormSelectChange() {
+            await loadV2Storm();
+            await runGruAnalysis();
+        }
+
         async function loadV2Storm() {
             const stormId = document.getElementById('stormSelect').value;
             try {
@@ -876,11 +881,17 @@
             document.getElementById('lblCoords').innerText = `${cur.lat}°N, ${cur.lon}°E`;
 
             // Clear previous map layers
-            if (centerMarker) map.removeLayer(centerMarker);
-            if (trackPolyline) map.removeLayer(trackPolyline);
-            if (forecastPolyline) map.removeLayer(forecastPolyline);
+            if (centerMarker) { map.removeLayer(centerMarker); centerMarker = null; }
+            if (trackPolyline) { map.removeLayer(trackPolyline); trackPolyline = null; }
+            if (forecastPolyline) { map.removeLayer(forecastPolyline); forecastPolyline = null; }
             coneCircles.forEach(c => map.removeLayer(c));
             coneCircles = [];
+
+            // Also clear previous GRU layers
+            if (gruTrackPolyline) { map.removeLayer(gruTrackPolyline); gruTrackPolyline = null; }
+            if (gruForecastPolyline) { map.removeLayer(gruForecastPolyline); gruForecastPolyline = null; }
+            gruMarkers.forEach(m => map.removeLayer(m));
+            gruMarkers = [];
 
             // Add center marker
             centerMarker = L.circleMarker([cur.lat, cur.lon], {
@@ -1086,10 +1097,17 @@
             if (!map) return;
 
             // Clear previous GRU layers
-            if (gruTrackPolyline) map.removeLayer(gruTrackPolyline);
-            if (gruForecastPolyline) map.removeLayer(gruForecastPolyline);
+            if (gruTrackPolyline) { map.removeLayer(gruTrackPolyline); gruTrackPolyline = null; }
+            if (gruForecastPolyline) { map.removeLayer(gruForecastPolyline); gruForecastPolyline = null; }
             gruMarkers.forEach(m => map.removeLayer(m));
             gruMarkers = [];
+
+            // Clear legacy Swin-ConvLSTM layers so there are no overlapping duplicate markers
+            if (centerMarker) { map.removeLayer(centerMarker); centerMarker = null; }
+            if (trackPolyline) { map.removeLayer(trackPolyline); trackPolyline = null; }
+            if (forecastPolyline) { map.removeLayer(forecastPolyline); forecastPolyline = null; }
+            coneCircles.forEach(c => map.removeLayer(c));
+            coneCircles = [];
 
             const hist = data.historical_track || [];
             const preds = data.gru_predicted_track || [];

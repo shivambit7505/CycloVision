@@ -7,10 +7,10 @@
   "mAP50": 0.9309,
   "mAP50_95": 0.8549,
   "inference_speed_ms": {
-    "preprocess": 0.345475000017359,
-    "inference": 18.032437499982734,
-    "postprocess": 1.0408562500288099,
-    "total_latency": 19.42
+    "preprocess": 0.3665062499749183,
+    "inference": 22.485237500063704,
+    "postprocess": 1.119837499913956,
+    "total_latency": 23.97
   },
   "classes": {
     "0": "cyclone_eye",
