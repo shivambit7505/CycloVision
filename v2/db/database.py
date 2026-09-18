@@ -41,6 +41,29 @@ def init_db(db_path: Optional[str] = None) -> None:
             );
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS weather_observations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                observation_type TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                temperature REAL,
+                relative_humidity REAL,
+                surface_pressure REAL,
+                wind_speed REAL,
+                wind_direction REAL,
+                precipitation REAL,
+                source TEXT NOT NULL,
+                raw_json TEXT,
+                created_at TEXT NOT NULL
+            );
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_weather_coords
+            ON weather_observations(latitude, longitude, timestamp);
+        """)
+
         cursor.execute("SELECT COUNT(*) FROM audit_reviews;")
         if cursor.fetchone()[0] == 0:
             initial_records = [
@@ -131,4 +154,49 @@ def get_storm_observations(storm_id: str) -> List[Dict[str, Any]]:
         cursor.execute("SELECT obs_id, storm_id, valid_time, lat, lon, wind_kts, pressure_hpa, stage FROM observations WHERE storm_id = ? ORDER BY obs_id ASC;", (storm_id,))
         return [dict(r) for r in cursor.fetchall()]
 
+def save_weather_observation(
+    latitude: float,
+    longitude: float,
+    observation_type: str,
+    timestamp: str,
+    temperature: Optional[float],
+    relative_humidity: Optional[float],
+    surface_pressure: Optional[float],
+    wind_speed: Optional[float],
+    wind_direction: Optional[float],
+    precipitation: Optional[float],
+    source: str = "Open-Meteo",
+    raw_json: Optional[str] = None
+) -> int:
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO weather_observations (
+                latitude, longitude, observation_type, timestamp,
+                temperature, relative_humidity, surface_pressure,
+                wind_speed, wind_direction, precipitation, source,
+                raw_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (
+            round(latitude, 4), round(longitude, 4), observation_type, timestamp,
+            temperature, relative_humidity, surface_pressure,
+            wind_speed, wind_direction, precipitation, source,
+            raw_json, now_str
+        ))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_latest_weather_observation(latitude: float, longitude: float, max_distance_deg: float = 0.5) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM weather_observations
+            WHERE ABS(latitude - ?) <= ? AND ABS(longitude - ?) <= ?
+            ORDER BY id DESC LIMIT 1;
+        """, (latitude, max_distance_deg, longitude, max_distance_deg))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
 init_db()
+

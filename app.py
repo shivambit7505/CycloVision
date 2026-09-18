@@ -22,6 +22,7 @@ from v2.models.yolov8_detector import detect_cyclone_center
 from v2.models.swin_convlstm import forecast_with_swin_convlstm
 from v2.gis.geodesic_radar import haversine_distance_km, compute_wind_radii, evaluate_shelter_risk
 from external_service import ExternalIntelligenceService
+from v2.services.weather_service import get_weather_provider
 
 ext_service = ExternalIntelligenceService()
 
@@ -338,6 +339,33 @@ def trigger_emergency_broadcast(payload: BroadcastAlertPayload):
 def api_bulletin(storm_name: str = "CYCLONE-X", wind_kmph: float = 165.0, stage: str = "VSCS"):
     text = generate_imd_bulletin_v2(storm_name, stage, wind_kmph, 965.0, "Puri, Odisha Sector", 18)
     return {"bulletin_text": text}
+
+@app.get("/api/weather/current")
+def api_get_current_weather(lat: float = 19.8, lon: float = 85.8):
+    """
+    Fetches real-time atmospheric & marine weather data from Open-Meteo.
+    Includes temperature, relative humidity, surface pressure, wind speed, wind direction, and precipitation.
+    """
+    try:
+        provider = get_weather_provider()
+        return provider.get_current_weather(lat, lon)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Weather service unavailable: {e}")
+
+@app.get("/api/weather/historical")
+def api_get_historical_weather(lat: float = 19.8, lon: float = 85.8, start_date: str = "2019-05-02", end_date: str = "2019-05-03"):
+    """
+    Fetches historical hourly weather observation archive from Open-Meteo.
+    """
+    try:
+        provider = get_weather_provider()
+        return provider.get_historical_weather(lat, lon, start_date, end_date)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Historical weather archive unavailable: {e}")
 
 if __name__ == "__main__":
     import uvicorn
