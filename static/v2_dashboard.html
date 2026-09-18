@@ -213,7 +213,7 @@
                 <div class="flex justify-between items-center mb-2 px-1 text-xs">
                     <div class="flex items-center gap-2">
                         <span class="font-bold text-white uppercase tracking-wider">Geospatial Decision Canvas</span>
-                        <span class="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800 font-mono">Swin-ConvLSTM Sequence</span>
+                        <span id="canvasModelBadge" class="text-[10px] bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800 font-mono">PyTorch GRU Neural Trajectory</span>
                     </div>
                     <div class="flex items-center gap-3 text-[11px] font-mono text-slate-300">
                         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-cyan-400"></span> Center</span>
@@ -841,7 +841,10 @@
         function initV2Map() {
             try {
                 map = L.map('v2map').setView([19.8, 85.8], 6);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(map);
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 16,
+                    attribution: '&copy; Esri, HERE, Garmin, FAO, NOAA, USGS'
+                }).addTo(map);
                 loadV2Storm();
                 loadAuditTrail();
                 runLocationRiskLive();
@@ -877,7 +880,7 @@
             document.getElementById('lblStormName').innerText = `CYCLONE ${meta.name}`;
             document.getElementById('lblCategory').innerText = `${meta.category} (${cur.stage || 'Active'})`;
             document.getElementById('lblWind').innerText = `${cur.wind_kts} kt (${Math.round(cur.wind_kts * 1.852)} km/h)`;
-            document.getElementById('lblPres').innerText = `${cur.pressure_hpa} hPa`;
+            document.getElementById('lblPres').innerText = `${cur.pressure_hpa || cur.pres || 945} hPa`;
             document.getElementById('lblCoords').innerText = `${cur.lat}°N, ${cur.lon}°E`;
 
             // Clear previous map layers
@@ -1097,17 +1100,10 @@
             if (!map) return;
 
             // Clear previous GRU layers
-            if (gruTrackPolyline) { map.removeLayer(gruTrackPolyline); gruTrackPolyline = null; }
-            if (gruForecastPolyline) { map.removeLayer(gruForecastPolyline); gruForecastPolyline = null; }
+            if (gruTrackPolyline) map.removeLayer(gruTrackPolyline);
+            if (gruForecastPolyline) map.removeLayer(gruForecastPolyline);
             gruMarkers.forEach(m => map.removeLayer(m));
             gruMarkers = [];
-
-            // Clear legacy Swin-ConvLSTM layers so there are no overlapping duplicate markers
-            if (centerMarker) { map.removeLayer(centerMarker); centerMarker = null; }
-            if (trackPolyline) { map.removeLayer(trackPolyline); trackPolyline = null; }
-            if (forecastPolyline) { map.removeLayer(forecastPolyline); forecastPolyline = null; }
-            coneCircles.forEach(c => map.removeLayer(c));
-            coneCircles = [];
 
             const hist = data.historical_track || [];
             const preds = data.gru_predicted_track || [];
