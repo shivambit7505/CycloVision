@@ -67,7 +67,7 @@ class CycloneCenterDetector:
                         cx = int((xyxy[0] + xyxy[2]) / 2)
                         cy = int((xyxy[1] + xyxy[3]) / 2)
                         conf = float(box.conf[0])
-                        return self._format_result(cx, cy, w, h, conf, "YOLOv8-DeepDetector")
+                        return self._format_result(cx, cy, w, h, conf, "Trained Ultralytics YOLOv8n (models/yolo/best.pt)", detected=True, bbox_xyxy=xyxy)
                 except Exception:
                     pass
 
@@ -78,16 +78,16 @@ class CycloneCenterDetector:
             # Center nudge towards barycenter
             cx = int(0.7 * (w // 2) + 0.3 * cx)
             cy = int(0.7 * (h // 2) + 0.3 * cy)
-            return self._format_result(cx, cy, w, h, 0.94, "YOLOv8-ConvectiveSymmetry")
+            return self._format_result(cx, cy, w, h, 0.50, "Convective Gradient Heuristic (YOLO No-Detection Fallback)", detected=False)
 
         except Exception as e:
             # Safe boundary fallback
-            return self._format_result(128, 128, 256, 256, 0.85, f"FallbackDefault ({e})")
+            return self._format_result(128, 128, 256, 256, 0.30, f"Fallback Boundary Default ({e})", detected=False)
 
-    def _format_result(self, cx: int, cy: int, w: int, h: int, conf: float, engine: str) -> Dict[str, Any]:
+    def _format_result(self, cx: int, cy: int, w: int, h: int, conf: float, engine: str, detected: bool = True, bbox_xyxy: list = None) -> Dict[str, Any]:
         # Eye diameter in km estimated from resolution (assuming ~4km/pixel for standard satellite crops)
         eye_diam_km = round(18.0 + (1.0 - abs(cx / w - 0.5)) * 24.0, 1)
-        symmetry_score = round(min(0.98, max(0.65, conf + 0.04)), 2)
+        symmetry_score = round(min(0.98, max(0.50, conf + 0.04)), 2)
         
         # Inferred T-number from eye definition & symmetry
         t_number = round(min(8.0, max(2.0, 3.0 + symmetry_score * 3.5)), 1)
@@ -96,11 +96,13 @@ class CycloneCenterDetector:
 
         return {
             "engine": engine,
+            "detected": detected,
             "detected_center": {"x": int(cx), "y": int(cy)},
             "normalized_center": {"x": round(cx / max(1, w), 3), "y": round(cy / max(1, h), 3)},
+            "bbox_xyxy": bbox_xyxy or [cx - 20, cy - 20, cx + 20, cy + 20],
             "eye_diameter_km": eye_diam_km,
             "symmetry_score": symmetry_score,
-            "confidence": round(conf, 2),
+            "confidence": round(conf, 4),
             "dvorak_t_number": t_number,
             "estimated_wind_knots": wind_kts,
             "estimated_wind_kmph": wind_kmph

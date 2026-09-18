@@ -88,11 +88,14 @@ def evaluate_shelter_risk(
         results.append({
             "shelter_name": s.get("name", "Unknown Shelter"),
             "district": s.get("district", "Coastal"),
+            "lat": s_lat,
+            "lon": s_lon,
             "distance_km": dist_km,
             "bearing_deg": bearing,
             "impact_tier": tier,
             "surge_risk": surge_risk,
-            "capacity": s.get("capacity", 1500)
+            "capacity": s.get("capacity", 1500),
+            "status": s.get("status", "OPERATIONAL")
         })
 
     results.sort(key=lambda x: x["distance_km"])

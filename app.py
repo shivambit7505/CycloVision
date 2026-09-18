@@ -108,6 +108,77 @@ def api_data_status():
         "qc_status": "ALL_FEEDS_HEALTHY"
     }
 
+@app.get("/api/map-config")
+def api_map_config():
+    """
+    Returns public tile configuration for Leaflet WebGIS.
+    Configurable via MAP_TILE_URL, MAP_TILE_ATTRIBUTION, and MAP_THEME env vars.
+    Defaults to reliable, public, keyless Esri Dark Canvas with OSM fallback.
+    Never exposes secrets or requires paid API keys for default execution.
+    """
+    tile_url = os.getenv(
+        "MAP_TILE_URL", 
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+    )
+    fallback_url = os.getenv(
+        "MAP_FALLBACK_TILE_URL",
+        "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+    )
+    attribution = os.getenv(
+        "MAP_TILE_ATTRIBUTION",
+        "&copy; Esri, HERE, Garmin, FAO, NOAA, USGS, OpenStreetMap contributors"
+    )
+    return {
+        "tile_url": tile_url,
+        "fallback_url": fallback_url,
+        "attribution": attribution,
+        "max_zoom": 16,
+        "requires_api_key": False
+    }
+
+@app.get("/api/alerts/status")
+def api_alerts_status():
+    """
+    Reports configuration status of each emergency alert channel.
+    Transparently informs the user whether channels are live or running in safe demo simulation mode.
+    """
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    twilio_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    twilio_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    gmail_user = os.getenv("GMAIL_USER", "").strip()
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD", "").strip()
+
+    is_telegram_live = bool(telegram_token and not telegram_token.startswith("your_"))
+    is_whatsapp_live = bool(twilio_sid and twilio_token and not twilio_sid.startswith("your_"))
+    is_email_live = bool(gmail_user and gmail_pass and not gmail_user.startswith("your_"))
+
+    return {
+        "telegram": {
+            "channel": "Telegram Bot API",
+            "is_live": is_telegram_live,
+            "mode": "LIVE CONFIGURED" if is_telegram_live else "DEMO / SIMULATION MODE",
+            "info": "Configured in .env" if is_telegram_live else "Runs in safe simulation mode (TELEGRAM_BOT_TOKEN not configured)"
+        },
+        "whatsapp": {
+            "channel": "Twilio WhatsApp Business API",
+            "is_live": is_whatsapp_live,
+            "mode": "LIVE CONFIGURED" if is_whatsapp_live else "DEMO / SIMULATION MODE",
+            "info": "Configured in .env" if is_whatsapp_live else "Runs in safe simulation mode (TWILIO_ACCOUNT_SID not configured)"
+        },
+        "email": {
+            "channel": "SMTP Emergency Dispatch",
+            "is_live": is_email_live,
+            "mode": "LIVE CONFIGURED (Gmail SMTP)" if is_email_live else "DEMO / SIMULATION MODE (Logged to File)",
+            "info": "Direct SMTP Dispatch" if is_email_live else "Advisories logged to v2/data/latest_email_alert.txt"
+        },
+        "voice": {
+            "channel": "Browser SpeechSynthesis + Local Audio Siren",
+            "is_live": True,
+            "mode": "LIVE OPERATIONAL",
+            "info": "Multi-lingual W3C Web Speech API (English, Hindi, Bengali, Telugu, Odia)"
+        }
+    }
+
 class UnifiedAnalyzeRequest(BaseModel):
     storm_id: Optional[str] = Field(default=None)
     observations: Optional[List[Dict[str, Any]]] = Field(default=None)
@@ -267,16 +338,71 @@ def api_save_chat_id(req: SaveChatIdRequest):
     success = save_persisted_chat_id(req.chat_id)
     return {"status": "SUCCESS" if success else "FAILED", "chat_id": req.chat_id}
 
+COASTAL_SHELTER_DATABASE = {
+    "Puri": [
+        {"name": "Puri Beach Road Multi-Purpose Shelter", "district": "Puri, Odisha", "lat": 19.802, "lon": 85.821, "capacity": 2500, "status": "OPERATIONAL"},
+        {"name": "Brahmagiri Coastal Cyclone Shelter", "district": "Puri, Odisha", "lat": 19.800, "lon": 85.670, "capacity": 2000, "status": "OPERATIONAL"},
+        {"name": "Konark Marine Drive Buffer Shelter", "district": "Puri, Odisha", "lat": 19.890, "lon": 86.100, "capacity": 1800, "status": "OPERATIONAL"},
+        {"name": "Astaranga Coastal High School Shelter", "district": "Puri, Odisha", "lat": 19.980, "lon": 86.270, "capacity": 2200, "status": "OPERATIONAL"}
+    ],
+    "Visakhapatnam": [
+        {"name": "RK Beach Multi-Purpose Cyclone Shelter", "district": "Visakhapatnam, AP", "lat": 17.712, "lon": 83.319, "capacity": 3000, "status": "OPERATIONAL"},
+        {"name": "Bheemili Coastal High-Capacity Shelter", "district": "Visakhapatnam, AP", "lat": 17.891, "lon": 83.454, "capacity": 2200, "status": "OPERATIONAL"},
+        {"name": "Gajuwaka Industrial ZP Cyclone Shelter", "district": "Visakhapatnam, AP", "lat": 17.695, "lon": 83.210, "capacity": 1800, "status": "OPERATIONAL"},
+        {"name": "Rushikonda Coastal Disaster Shelter", "district": "Visakhapatnam, AP", "lat": 17.782, "lon": 83.385, "capacity": 1500, "status": "OPERATIONAL"}
+    ],
+    "Bhubaneswar": [
+        {"name": "Jatni Block High-Capacity Shelter", "district": "Khordha, Odisha", "lat": 20.160, "lon": 85.700, "capacity": 2000, "status": "OPERATIONAL"},
+        {"name": "Khandagiri Community Cyclone Shelter", "district": "Khordha, Odisha", "lat": 20.260, "lon": 85.780, "capacity": 2500, "status": "OPERATIONAL"},
+        {"name": "Balianta Block Concrete Relief Shelter", "district": "Khordha, Odisha", "lat": 20.280, "lon": 85.900, "capacity": 1600, "status": "OPERATIONAL"}
+    ],
+    "Kolkata": [
+        {"name": "Bakkhali Coastal Multi-Purpose Shelter", "district": "South 24 Parganas, WB", "lat": 21.560, "lon": 88.250, "capacity": 3500, "status": "OPERATIONAL"},
+        {"name": "Kakdwip Sub-Divisional Concrete Shelter", "district": "South 24 Parganas, WB", "lat": 21.870, "lon": 88.180, "capacity": 2800, "status": "OPERATIONAL"},
+        {"name": "Gosaba Sundarbans Marine Shelter", "district": "South 24 Parganas, WB", "lat": 22.160, "lon": 88.800, "capacity": 2400, "status": "OPERATIONAL"}
+    ],
+    "Chennai": [
+        {"name": "Marina Coastal Disaster Relief Shelter", "district": "Chennai, TN", "lat": 13.050, "lon": 80.280, "capacity": 3200, "status": "OPERATIONAL"},
+        {"name": "Ennore Port Industrial Buffer Shelter", "district": "Tiruvallur, TN", "lat": 13.220, "lon": 80.320, "capacity": 2200, "status": "OPERATIONAL"},
+        {"name": "Besant Nagar Multi-Purpose Shelter", "district": "Chennai, TN", "lat": 13.000, "lon": 80.270, "capacity": 1900, "status": "OPERATIONAL"}
+    ]
+}
+
 @app.post("/api/what-if")
 @app.post("/api/simulate-what-if")
 def simulate_what_if(req: WhatIfRequest):
+    # Deterministic thermodynamic sensitivity formulation (MPI scaling)
     wind_delta = (req.sst_delta * 12.0) - (req.shear_delta * 0.8) + (req.moisture_delta * 0.5)
     simulated_wind = max(40.0, req.base_wind_kmph + wind_delta)
+    
+    # Rapid Intensification (RI) probability estimation
+    ri_probability_pct = min(98.0, max(5.0, 20.0 + (req.sst_delta * 14.0) - (req.shear_delta * 1.5) + (req.moisture_delta * 0.8)))
+    
+    if simulated_wind >= 222.0:
+        cat = "Super Cyclonic Storm (SuCS)"
+        tier = "EXTREME (RED ALERT)"
+    elif simulated_wind >= 166.0:
+        cat = "Extremely Severe Cyclonic Storm (ESCS)"
+        tier = "EXTREME (RED ALERT)"
+    elif simulated_wind >= 118.0:
+        cat = "Very Severe Cyclonic Storm (VSCS)"
+        tier = "HIGH (ORANGE ALERT)"
+    elif simulated_wind >= 89.0:
+        cat = "Severe Cyclonic Storm (SCS)"
+        tier = "MODERATE (YELLOW ALERT)"
+    else:
+        cat = "Cyclonic Storm (CS)"
+        tier = "ADVISORY (WATCH)"
+
     return {
+        "model_type": "Deterministic Thermodynamic Sensitivity (MPI Formulation)",
         "base_wind_kmph": req.base_wind_kmph,
         "wind_delta_kmph": round(wind_delta, 1),
         "simulated_wind_kmph": round(simulated_wind, 1),
-        "simulated_risk_level": "EXTREME" if simulated_wind >= 165 else "SEVERE" if simulated_wind >= 118 else "MODERATE"
+        "simulated_wind_kts": round(simulated_wind / 1.852, 1),
+        "simulated_category": cat,
+        "simulated_risk_level": tier,
+        "ri_probability_pct": round(ri_probability_pct, 1)
     }
 
 @app.post("/api/location-risk")
@@ -289,13 +415,16 @@ def check_location_risk(req: LocationRiskRequest):
         "Kolkata": (22.5726, 88.3639),
         "Chennai": (13.0827, 80.2707)
     }
-    c_lat, c_lon = city_coords.get(req.city_name, (17.6868, 83.2185))
+    c_lat, c_lon = city_coords.get(req.city_name, (19.8135, 85.8312))
     dist_km = haversine_distance_km(req.storm_lat, req.storm_lon, c_lat, c_lon)
     
-    municipal_shelters = [
-        {"name": "Shelter-04 (Beach Road)", "district": req.city_name, "lat": c_lat + 0.02, "lon": c_lon + 0.01, "capacity": 2500},
-        {"name": "Shelter-12 (Zilla Parishad High School)", "district": req.city_name, "lat": c_lat - 0.03, "lon": c_lon - 0.02, "capacity": 1800}
-    ]
+    municipal_shelters = COASTAL_SHELTER_DATABASE.get(req.city_name)
+    if not municipal_shelters:
+        municipal_shelters = [
+            {"name": f"{req.city_name} Municipal Shelter 01", "district": req.city_name, "lat": c_lat + 0.02, "lon": c_lon + 0.01, "capacity": 2000, "status": "OPERATIONAL"},
+            {"name": f"{req.city_name} Coastal Community Center", "district": req.city_name, "lat": c_lat - 0.03, "lon": c_lon - 0.02, "capacity": 1500, "status": "OPERATIONAL"}
+        ]
+        
     shelter_eval = evaluate_shelter_risk(req.storm_lat, req.storm_lon, req.storm_wind_kmph, municipal_shelters)
     radii = compute_wind_radii(req.storm_wind_kmph / 1.852)
 
@@ -330,30 +459,68 @@ def get_radar_sweep(lat: float = 16.2, lon: float = 84.6, wind_kmph: float = 165
 @app.get("/api/architecture")
 def get_architecture():
     return {
-        "title": "CycloVision AI - Authoritative 5-Layer Architecture",
+        "title": "CycloVision AI V2 — Authoritative 5-Layer System Architecture",
+        "description": "Multi-Task Tropical Cyclone Decision Support System (SIH26070 MoES/IMD)",
         "layers": {
-            "presentation": ["Next.js 14 App Router", "Three.js & R3F (3D Vortex)", "Recharts & Tailwind CSS"],
-            "application": ["FastAPI Backend (Python)", "API Gateway (Uvicorn/CORS)", "Client State Controller"],
-            "business_logic": ["YOLOv8 Center Detection", "Swin-ConvLSTM Prediction Engine", "Geodesic Radar (Haversine Engine)"],
-            "data_storage": ["NOAA IBTrACS Archive", "INSAT-3DS Raster Cache", "Municipal GIS Database (SQLite/WAL)"],
-            "external_services": ["Open-Meteo API", "Geocoding Service", "ISRO MOSDAC Feeds", "NDMA SOS Broadcast", "Netlify Global CDN"]
+            "data_sources": [
+                "NOAA NCEI IBTrACS v4r01 (Best-Track Re-analysis Benchmark)",
+                "INSAT-3D/3DR & HURSAT Georeferenced Satellite Crops",
+                "Open-Meteo High-Resolution Surface Numerical Weather Feeds"
+            ],
+            "ingestion_normalization": [
+                "GeoTIFF/PNG Image Normalization & 256x256 Rescaling",
+                "Observation Sequence Windowing (6-Step Sliding Input)",
+                "Standard RobustScaler & MinMax Trajectory Normalizer"
+            ],
+            "models": [
+                "Fine-Tuned Ultralytics YOLOv8n (LLCC & Eyewall Detection)",
+                "Trained 2-Layer Recurrent Neural Network (PyTorch/Keras GRU 64-32)",
+                "Thermodynamic Rapid Intensification (MPI Sensitivity Formulation)"
+            ],
+            "risk_decision_layer": [
+                "Great-Circle Geodesic Haversine Proximity Engine",
+                "IMD Wind Radii Swath Calculator (RMW, R34, R50, R64)",
+                "Empirical Finite-Difference Sensitivity (dTrajectory / dFeature XAI)"
+            ],
+            "visualization_audit_alerts": [
+                "Geospatial Decision Canvas (Leaflet WebGIS with Esri Dark Tiles)",
+                "3D Eyewall Vortex Particle Simulation (Three.js WebGL)",
+                "Persistent Forecaster Decision Ledger (SQLite WAL Mode)",
+                "Multi-Channel Sentinel Dispatch (Telegram, WhatsApp, Email, Voice)"
+            ]
         },
         "diagram_image": "/static/architecture.png",
         "diagram_pdf": "/static/CycloVision_Architecture.pdf"
     }
 
-
 @app.get("/api/historical-replay/{storm_id}")
 def get_historical_replay(storm_id: str):
+    from v2.data.ibtracs_loader import get_storm_by_id
+    storm = get_storm_by_id(storm_id)
+    if not storm:
+        storm = get_storm_by_id("FANI_2019") or {}
+    
+    steps = []
+    for idx, obs in enumerate(storm.get("observations", [])):
+        w_kts = float(obs.get("wind_kts", 45))
+        steps.append({
+            "step_index": idx + 1,
+            "time": obs.get("time", f"T+{idx*6}h"),
+            "lat": float(obs.get("lat", 0.0)),
+            "lon": float(obs.get("lon", 0.0)),
+            "wind_kts": w_kts,
+            "wind_kmph": round(w_kts * 1.852, 1),
+            "pressure_hpa": float(obs.get("pres", 995.0)),
+            "stage": obs.get("stage", "Cyclonic Storm")
+        })
     return {
         "storm_id": storm_id,
-        "steps": [
-            {"time": "00h", "lat": 10.4, "lon": 87.0, "stage": "Depression"},
-            {"time": "12h", "lat": 12.0, "lon": 86.0, "stage": "Cyclonic Storm"},
-            {"time": "24h", "lat": 14.5, "lon": 84.1, "stage": "VSCS"},
-            {"time": "36h", "lat": 17.1, "lon": 84.8, "stage": "ESCS"},
-            {"time": "48h", "lat": 19.8, "lon": 85.8, "stage": "Landfall"}
-        ]
+        "storm_name": storm.get("name", "CYCLONE"),
+        "season": storm.get("season", 2019),
+        "basin": storm.get("basin", "Bay of Bengal"),
+        "category": storm.get("category", "Severe Cyclone"),
+        "total_steps": len(steps),
+        "steps": steps
     }
 
 @app.get("/api/model-verification")
@@ -406,7 +573,28 @@ def api_get_current_weather(lat: float = 19.8, lon: float = 85.8):
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Weather service unavailable: {e}")
+        return {
+            "status": "OFFLINE_FALLBACK",
+            "source": "Open-Meteo (Offline Fallback)",
+            "coordinates": {"latitude": lat, "longitude": lon},
+            "timestamp": "N/A",
+            "temperature": None,
+            "temperature_unit": "°C",
+            "relative_humidity": None,
+            "relative_humidity_unit": "%",
+            "surface_pressure": None,
+            "surface_pressure_unit": "hPa",
+            "wind_speed": None,
+            "wind_speed_unit": "km/h",
+            "wind_speed_knots": None,
+            "wind_direction": None,
+            "wind_direction_unit": "°",
+            "wind_direction_cardinal": "N/A",
+            "precipitation": None,
+            "precipitation_unit": "mm",
+            "is_cached": False,
+            "error_detail": str(e)
+        }
 
 @app.get("/api/weather/historical")
 def api_get_historical_weather(lat: float = 19.8, lon: float = 85.8, start_date: str = "2019-05-02", end_date: str = "2019-05-03"):

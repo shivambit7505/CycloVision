@@ -15,10 +15,13 @@ def api_v2_storm_state(storm_id: str):
     if not storm:
         raise HTTPException(status_code=404, detail=f"Storm with ID '{storm_id}' not found.")
     
-    last_obs = storm["observations"][-1]
+    last_obs = dict(storm["observations"][-1])
     obs_wind = float(last_obs.get("wind_kts", 65.0))
+    pressure = last_obs.get("pres") if last_obs.get("pres") is not None else last_obs.get("pressure_hpa")
+    last_obs["pressure_hpa"] = pressure
+    last_obs["pres"] = pressure
+    last_obs["wind_kmph"] = round(obs_wind * 1.852, 1)
 
-    
     # Dynamically invert Dvorak Atkinson-Holliday wind: T = (wind_kts / 23.0) ** (1 / 0.95)
     dynamic_t_number = round(max(1.5, min(8.0, (obs_wind / 23.0) ** (1.0 / 0.95))), 1)
     
@@ -39,7 +42,43 @@ def api_v2_storm_state(storm_id: str):
     track = forecast_track_v2(cur_lat=last_obs["lat"], cur_lon=last_obs["lon"])
     landfall = compute_gis_landfall(track, current_coords={"lat": last_obs["lat"], "lon": last_obs["lon"]})
     
+    normalized_storm = {
+        "id": storm_id,
+        "name": storm.get("name", "CYCLONE"),
+        "mode": "historical",
+        "source": "NOAA NCEI IBTrACS v4r01 (Best-Track Re-analysis)",
+        "season": storm.get("season"),
+        "basin": basin,
+        "category": storm.get("category", "Cyclonic Storm"),
+        "timestamp": last_obs.get("time"),
+        "center": {
+            "lat": float(last_obs.get("lat", 0.0)),
+            "lon": float(last_obs.get("lon", 0.0))
+        },
+        "max_wind_kt": obs_wind,
+        "max_wind_kmh": round(obs_wind * 1.852, 1),
+        "central_pressure_hpa": pressure,
+        "stage": last_obs.get("stage", "Cyclonic Storm"),
+        "observations_count": len(storm.get("observations", [])),
+        "track": [
+            {
+                "time": o.get("time"),
+                "lat": float(o.get("lat", 0.0)),
+                "lon": float(o.get("lon", 0.0)),
+                "wind_kts": float(o.get("wind_kts", 0)),
+                "wind_kmph": round(float(o.get("wind_kts", 0)) * 1.852, 1),
+                "pressure_hpa": o.get("pres"),
+                "stage": o.get("stage")
+            }
+            for o in storm.get("observations", [])
+        ],
+        "forecast_track": track,
+        "observations": storm.get("observations", []),
+        "confidence": "HIGH (Historical Best-Track Benchmark)"
+    }
+
     return {
+        "storm": normalized_storm,
         "metadata": storm,
         "current_state": last_obs,
         "v2_intensity": intensity,

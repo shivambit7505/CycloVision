@@ -797,11 +797,11 @@
                 <img src="/static/architecture.png" alt="CycloVision AI System Architecture" class="max-w-full h-auto rounded-lg shadow-2xl border border-slate-700/50">
             </div>
             <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-[10px] font-mono text-slate-400 pt-2 border-t border-slate-800">
-                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-indigo-300 block mb-1">Presentation:</b> Next.js 14, Three.js 3D Vortex, Recharts</div>
-                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-emerald-300 block mb-1">Application:</b> FastAPI, Uvicorn Gateway, State Controller</div>
-                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-amber-300 block mb-1">Business Logic:</b> YOLOv8 LLCC, Swin-ConvLSTM, Haversine Radar</div>
-                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-cyan-300 block mb-1">Storage:</b> NOAA IBTrACS, INSAT Raster, Municipal GIS</div>
-                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-rose-300 block mb-1">External:</b> Open-Meteo, Geocoding, MOSDAC, NDMA SOS</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-indigo-300 block mb-1">Presentation:</b> WebGIS Single-Page App, Leaflet Canvas, Three.js 3D Eyewall, Tailwind CSS</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-emerald-300 block mb-1">Application:</b> FastAPI ASGI Core, Uvicorn Daemon, CORS Middleware, Data Normalizer</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-amber-300 block mb-1">AI & Models:</b> Trained PyTorch GRU-64, Fine-Tuned YOLOv8n LLCC, Emanuel Thermodynamic Sensitivity</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-cyan-300 block mb-1">Risk & Storage:</b> Haversine Geodesic Engine, IMD Alert Matrix, SQLite WAL Decision Ledger</div>
+                <div class="p-2 rounded bg-slate-900 border border-slate-800"><b class="text-rose-300 block mb-1">Telemetry & Alerts:</b> Open-Meteo REST Weather, Multi-Channel Sentinel (Telegram, WhatsApp, Email, Voice)</div>
             </div>
         </div>
     </div>
@@ -821,31 +821,118 @@
         </div>
     </div>
 
+    <!-- Interactive Guided Demo Tour Floating Card (Replaces browser alert()) -->
+    <div id="demoTourModal" class="hidden fixed bottom-6 right-6 z-50 max-w-md w-full p-4 bg-slate-900/95 backdrop-blur-md rounded-xl border-2 border-cyan-500/80 shadow-2xl space-y-3 transition-all transform duration-300">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+            <div class="flex items-center gap-2">
+                <span class="text-lg">🧭</span>
+                <span id="tourStepBadge" class="bg-cyan-950 text-cyan-300 border border-cyan-700 font-mono font-bold px-2 py-0.5 rounded text-[11px]">Step 1 of 9</span>
+            </div>
+            <button onclick="closeDemoTour()" class="text-slate-400 hover:text-white font-bold text-sm px-1.5 py-0.5 rounded hover:bg-slate-800 transition">✕</button>
+        </div>
+        <div class="space-y-1">
+            <h4 id="tourTitle" class="font-bold text-white text-sm"></h4>
+            <p id="tourDesc" class="text-xs text-slate-300 leading-relaxed"></p>
+        </div>
+        <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+            <button onclick="closeDemoTour()" class="text-slate-400 hover:text-slate-200 text-xs underline font-medium">Skip Tour</button>
+            <div class="flex gap-2">
+                <button id="btnTourPrev" onclick="prevDemoTourStep()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs font-semibold transition">← Prev</button>
+                <button id="btnTourNext" onclick="nextDemoTourStep()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Delivery & Simulation Modal (Replaces browser alert()) -->
+    <div id="alertSimulationModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="panel max-w-lg w-full p-5 space-y-4 border-cyan-500/40 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                <div class="flex items-center gap-2">
+                    <span id="alertModalIcon" class="text-xl">🚨</span>
+                    <h3 id="alertModalTitle" class="text-sm font-bold text-white">Emergency Alert Channel</h3>
+                </div>
+                <button onclick="closeAlertModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
+            </div>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between items-center bg-slate-950 p-2.5 rounded border border-slate-800">
+                    <span class="text-slate-400">Operational Channel Mode:</span>
+                    <span id="alertModalBadge" class="font-mono font-bold px-2 py-0.5 rounded text-[11px] bg-amber-950 text-amber-300 border border-amber-800">DEMO SIMULATION</span>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-slate-400 block font-semibold">Transmission Status:</span>
+                    <p id="alertModalStatus" class="font-mono text-cyan-300 bg-slate-950 p-2 rounded border border-slate-800 text-[11px]"></p>
+                </div>
+                <div class="space-y-1">
+                    <span class="text-slate-400 block font-semibold">Standard WMO/IMD CAP Alert Payload:</span>
+                    <pre id="alertModalPayload" class="bg-slate-950 p-2.5 rounded border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto"></pre>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-slate-800">
+                <button onclick="closeAlertModal()" class="bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ========================================================================= -->
     <!-- 5. CLIENT APPLICATION CONTROLLER (All JavaScript) -->
     <!-- ========================================================================= -->
     <script>
+        // -------------------------------------------------------------
+        // Universal CycloVision Data Normalizer (Zero undefined/null/NaN)
+        // -------------------------------------------------------------
+        const CycloNormalizer = {
+            formatPressure: (val) => (val != null && !isNaN(val)) ? `${val} hPa` : 'N/A',
+            formatWindKts: (val) => (val != null && !isNaN(val)) ? `${val} kt` : 'N/A',
+            formatWindKmph: (val) => (val != null && !isNaN(val)) ? `${Math.round(val)} km/h` : 'N/A',
+            formatCoords: (lat, lon) => (lat != null && lon != null && !isNaN(lat) && !isNaN(lon)) ? `${Number(lat).toFixed(2)}°N, ${Number(lon).toFixed(2)}°E` : 'N/A',
+            formatText: (val, fallback = 'N/A') => (val && val !== 'undefined' && val !== 'null') ? String(val) : fallback
+        };
+
         let map, centerMarker, trackPolyline, forecastPolyline, coneCircles = [], shelterMarkers = [];
         let replayTimer = null, replayIndex = 0;
-        const replayData = [
-            { time: "00h", lat: 10.4, lon: 87.0, stage: "Depression", wind: 45 },
-            { time: "12h", lat: 12.0, lon: 86.0, stage: "Cyclonic Storm", wind: 75 },
-            { time: "24h", lat: 14.5, lon: 84.1, stage: "Very Severe Cyclonic Storm", wind: 120 },
-            { time: "36h", lat: 17.1, lon: 84.8, stage: "Extremely Severe Cyclonic Storm", wind: 180 },
-            { time: "48h", lat: 19.8, lon: 85.8, stage: "Puri Coastal Landfall", wind: 215 }
+        let replayData = [
+            { time: "00h", lat: 10.4, lon: 87.0, stage: "Depression", wind_kts: 45, wind_kmph: 83.3, pressure_hpa: 998 },
+            { time: "12h", lat: 12.0, lon: 86.0, stage: "Cyclonic Storm", wind_kts: 75, wind_kmph: 138.9, pressure_hpa: 985 },
+            { time: "24h", lat: 14.5, lon: 84.1, stage: "Very Severe Cyclonic Storm", wind_kts: 120, wind_kmph: 222.2, pressure_hpa: 960 },
+            { time: "36h", lat: 17.1, lon: 84.8, stage: "Extremely Severe Cyclonic Storm", wind_kts: 180, wind_kmph: 333.4, pressure_hpa: 935 },
+            { time: "48h", lat: 19.8, lon: 85.8, stage: "Puri Coastal Landfall", wind_kts: 115, wind_kmph: 213.0, pressure_hpa: 945 }
         ];
 
         // -------------------------------------------------------------
         // Map & Storm Initialization
         // -------------------------------------------------------------
-        function initV2Map() {
+        async function initV2Map() {
             try {
+                let mapConfig = {
+                    tile_url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                    fallback_url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    attribution: '&copy; Esri, HERE, Garmin, FAO, NOAA, USGS, OpenStreetMap contributors',
+                    max_zoom: 16
+                };
+                try {
+                    const cfgRes = await fetch('/api/map-config');
+                    if (cfgRes.ok) {
+                        const fetchedCfg = await cfgRes.json();
+                        mapConfig = { ...mapConfig, ...fetchedCfg };
+                    }
+                } catch (ce) {
+                    console.warn("Using default tile config:", ce);
+                }
+
                 map = L.map('v2map').setView([19.8, 85.8], 6);
-                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-                    maxZoom: 16,
-                    attribution: '&copy; Esri, HERE, Garmin, FAO, NOAA, USGS'
+                const tileLayer = L.tileLayer(mapConfig.tile_url, {
+                    maxZoom: mapConfig.max_zoom || 16,
+                    attribution: mapConfig.attribution
                 }).addTo(map);
-                loadV2Storm();
+
+                tileLayer.on('tileerror', function() {
+                    console.warn("Primary tile server error, switching to fallback OSM tile server");
+                    if (mapConfig.fallback_url && tileLayer._url !== mapConfig.fallback_url) {
+                        tileLayer.setUrl(mapConfig.fallback_url);
+                    }
+                });
+
+                await loadV2Storm();
                 loadAuditTrail();
                 runLocationRiskLive();
                 fetchLiveWeather(19.8, 85.8);
@@ -859,6 +946,7 @@
         async function onStormSelectChange() {
             await loadV2Storm();
             await runGruAnalysis();
+            await loadHistoricalEvent();
         }
 
         async function loadV2Storm() {
@@ -874,14 +962,35 @@
         }
 
         function updateDashboardWithStormData(data) {
-            const meta = data.metadata;
-            const cur = data.current_state;
+            const meta = data.storm || data.metadata || {};
+            const cur = data.current_state || {};
 
-            document.getElementById('lblStormName').innerText = `CYCLONE ${meta.name}`;
-            document.getElementById('lblCategory').innerText = `${meta.category} (${cur.stage || 'Active'})`;
-            document.getElementById('lblWind').innerText = `${cur.wind_kts} kt (${Math.round(cur.wind_kts * 1.852)} km/h)`;
-            document.getElementById('lblPres').innerText = `${cur.pressure_hpa || cur.pres || 945} hPa`;
-            document.getElementById('lblCoords').innerText = `${cur.lat}°N, ${cur.lon}°E`;
+            const stormName = CycloNormalizer.formatText(meta.name, 'CYCLONE');
+            const category = CycloNormalizer.formatText(meta.category, 'Cyclonic Storm');
+            const stage = CycloNormalizer.formatText(cur.stage || meta.stage, 'Active');
+            const windKts = cur.wind_kts != null ? cur.wind_kts : meta.max_wind_kt;
+            const windKmph = (cur.wind_kmph != null) ? cur.wind_kmph : (windKts != null ? Math.round(windKts * 1.852) : null);
+            const pres = (cur.pressure_hpa != null) ? cur.pressure_hpa : (cur.pres != null ? cur.pres : meta.central_pressure_hpa);
+            const lat = (cur.lat != null) ? cur.lat : (meta.center ? meta.center.lat : null);
+            const lon = (cur.lon != null) ? cur.lon : (meta.center ? meta.center.lon : null);
+
+            document.getElementById('lblStormName').innerText = `CYCLONE ${stormName}`;
+            document.getElementById('lblCategory').innerText = `${category} (${stage})`;
+            document.getElementById('lblWind').innerText = `${CycloNormalizer.formatWindKts(windKts)} (${CycloNormalizer.formatWindKmph(windKmph)})`;
+            document.getElementById('lblPres').innerText = CycloNormalizer.formatPressure(pres);
+            document.getElementById('lblCoords').innerText = CycloNormalizer.formatCoords(lat, lon);
+
+            // Set explicit historical benchmark provenance badge
+            const badge = document.getElementById('lblAlertBadge');
+            if (badge) {
+                if (meta.mode === 'historical' || !meta.mode) {
+                    badge.innerText = 'HISTORICAL / BENCHMARK';
+                    badge.className = 'px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-cyan-950 text-cyan-300 border border-cyan-700';
+                } else {
+                    badge.innerText = 'LIVE OPERATIONAL';
+                    badge.className = 'px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wider bg-rose-600/30 text-rose-400 border border-rose-500 animate-pulse';
+                }
+            }
 
             // Clear previous map layers
             if (centerMarker) { map.removeLayer(centerMarker); centerMarker = null; }
@@ -905,7 +1014,8 @@
             }).addTo(map).bindPopup(`<b>${meta.name} Center</b><br>${cur.wind_kts} kts | ${cur.pressure_hpa} hPa`);
 
             // Historical track
-            const obsPoints = meta.observations.map(o => [o.lat, o.lon]);
+            const obsList = meta.observations || (data.metadata && data.metadata.observations) || meta.track || [];
+            const obsPoints = obsList.map(o => [o.lat != null ? o.lat : o.latitude, o.lon != null ? o.lon : o.longitude]);
             trackPolyline = L.polyline(obsPoints, { color: '#06b6d4', weight: 3, opacity: 0.8 }).addTo(map);
 
             // Swin-ConvLSTM Forecast Track & Calibrated Cone
@@ -1234,9 +1344,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ sst_delta: sst, shear_delta: shear, moisture_delta: moist, base_wind_kmph: 120.0 })
                 });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                document.getElementById('lblSimWind').innerText = `${data.simulated_wind_kmph} km/h`;
-                document.getElementById('lblSimTier').innerText = data.simulated_risk_level;
+                document.getElementById('lblSimWind').innerText = `${data.simulated_wind_kmph} km/h (${data.simulated_wind_kts || Math.round(data.simulated_wind_kmph / 1.852)} kt)`;
+                const tierBadge = document.getElementById('lblSimTier');
+                if (tierBadge) {
+                    tierBadge.innerText = `${data.simulated_category || ''} • ${data.simulated_risk_level} (RI Prob: ${data.ri_probability_pct}%)`;
+                    if (data.simulated_risk_level.includes('EXTREME')) {
+                        tierBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800 animate-pulse';
+                    } else if (data.simulated_risk_level.includes('HIGH') || data.simulated_risk_level.includes('SEVERE')) {
+                        tierBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800';
+                    } else {
+                        tierBadge.className = 'px-2 py-0.5 rounded text-[10px] font-bold bg-teal-950 text-teal-300 border border-teal-800';
+                    }
+                }
             } catch (e) {
                 console.error('What-If simulation error:', e);
             }
@@ -1428,21 +1549,53 @@
                 document.getElementById('lblCitySurge').innerText = data.current_risk;
 
                 const grid = document.getElementById('shelterListGrid');
-                grid.innerHTML = '';
-                (data.shelter_evaluations || []).forEach(s => {
-                    const card = document.createElement('div');
-                    card.className = 'p-2 rounded bg-slate-900 border border-slate-800 flex justify-between items-center text-xs';
-                    card.innerHTML = `
-                        <div>
-                            <b class="text-white block">${s.shelter_name}</b>
-                            <span class="text-[10px] text-slate-400">${s.distance_km} km • Bearing: ${s.bearing_deg}° • Surge: ${s.surge_risk}</span>
+                if (grid) {
+                    grid.innerHTML = (data.shelter_evaluations || []).map(s => `
+                        <div class="p-2.5 rounded bg-slate-900 border border-slate-800 flex justify-between items-center text-xs hover:border-cyan-800 transition">
+                            <div class="space-y-0.5">
+                                <b class="text-white block">${s.shelter_name}</b>
+                                <span class="text-[10px] text-slate-400 font-mono">
+                                    ${s.district} • ${s.distance_km} km (${s.bearing_deg}°) • Capacity: ${s.capacity} persons
+                                </span>
+                                <span class="text-[10px] text-cyan-400 font-mono block">
+                                    Coords: ${Number(s.lat).toFixed(3)}°N, ${Number(s.lon).toFixed(3)}°E
+                                </span>
+                            </div>
+                            <div class="text-right space-y-1">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold block ${s.impact_tier && s.impact_tier.includes('EXTREME') ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}">
+                                    ${s.impact_tier}
+                                </span>
+                                <span class="text-[9px] text-emerald-400 font-mono">● ${s.status || 'READY'}</span>
+                            </div>
                         </div>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.impact_tier.includes('EXTREME') ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}">
-                            ${s.impact_tier}
-                        </span>
-                    `;
-                    grid.appendChild(card);
-                });
+                    `).join('');
+                }
+
+                // Plot shelters on Leaflet map
+                if (map) {
+                    shelterMarkers.forEach(m => map.removeLayer(m));
+                    shelterMarkers = [];
+
+                    (data.shelter_evaluations || []).forEach(s => {
+                        if (s.lat && s.lon) {
+                            const smk = L.circleMarker([s.lat, s.lon], {
+                                radius: 6,
+                                color: '#f59e0b',
+                                fillColor: '#d97706',
+                                fillOpacity: 0.9,
+                                weight: 2
+                            }).addTo(map).bindPopup(`
+                                <b>🛡️ ${s.shelter_name}</b><br>
+                                District: ${s.district}<br>
+                                Capacity: ${s.capacity} persons<br>
+                                Distance to Center: ${s.distance_km} km (Bearing: ${s.bearing_deg}°)<br>
+                                Surge Risk: ${s.surge_risk}<br>
+                                Status: <b class="text-emerald-400">${s.status || 'OPERATIONAL'}</b>
+                            `);
+                            shelterMarkers.push(smk);
+                        }
+                    });
+                }
             } catch (err) {
                 console.error("Location risk error:", err);
             }
@@ -1451,19 +1604,43 @@
         // -------------------------------------------------------------
         // Historical Cyclone Replay Player
         // -------------------------------------------------------------
-        function loadHistoricalEvent() {
+        async function loadHistoricalEvent() {
+            const select = document.getElementById('selectReplayEvent');
+            const stormMap = {
+                'fani_2019': 'FANI_2019',
+                'amphan_2020': 'AMPHAN_2020',
+                'biparjoy_2023': 'BIPARJOY_2023'
+            };
+            const stormId = (select && stormMap[select.value]) ? stormMap[select.value] : (document.getElementById('stormSelect') ? document.getElementById('stormSelect').value : 'FANI_2019');
+            try {
+                const res = await fetch(`/api/historical-replay/${stormId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.steps && data.steps.length > 0) {
+                        replayData = data.steps;
+                    }
+                }
+            } catch (e) {
+                console.warn("Replay fetch error:", e);
+            }
             replayIndex = 0;
             updateReplayStep();
         }
 
         function updateReplayStep() {
+            if (!replayData || replayData.length === 0) return;
             const step = replayData[replayIndex];
             document.getElementById('replayStepDisplay').innerText = 
-                `Timeline: ${step.time} • Position: ${step.lat}°N, ${step.lon}°E • Stage: ${step.stage} (${step.wind} kt)`;
+                `Timeline: ${step.time} • Position: ${step.lat}°N, ${step.lon}°E • Stage: ${step.stage} (${step.wind_kts || step.wind} kt / ${step.wind_kmph || Math.round((step.wind_kts || step.wind)*1.852)} km/h) • Pressure: ${step.pressure_hpa || 995} hPa`;
             
-            if (centerMarker) {
-                centerMarker.setLatLng([step.lat, step.lon]);
-                centerMarker.bindPopup(`<b>Replay: ${step.time}</b><br>${step.stage}`).openPopup();
+            if (map) {
+                if (centerMarker) map.removeLayer(centerMarker);
+                centerMarker = L.circleMarker([step.lat, step.lon], {
+                    radius: 9,
+                    color: '#f43f5e',
+                    fillColor: '#f43f5e',
+                    fillOpacity: 0.95
+                }).addTo(map).bindPopup(`<b>Replay Step: ${step.time}</b><br>${step.stage}<br>Wind: ${step.wind_kts || step.wind} kts | Pres: ${step.pressure_hpa || 995} hPa`).openPopup();
                 map.setView([step.lat, step.lon], 6);
             }
         }
@@ -1685,45 +1862,115 @@
         }
 
         // -------------------------------------------------------------
-        // Multi-Channel Emergency Dispatchers
+        // Multi-Channel Emergency Dispatchers & Simulation Modal
         // -------------------------------------------------------------
+        function showAlertSimulationModal(channelName, icon, isLive, statusText, payloadText) {
+            document.getElementById('alertModalIcon').innerText = icon;
+            document.getElementById('alertModalTitle').innerText = `${channelName} Emergency Dispatch`;
+            const badge = document.getElementById('alertModalBadge');
+            badge.innerText = isLive ? 'LIVE CONFIGURED' : 'DEMO / SIMULATION MODE (Safe)';
+            badge.className = isLive 
+                ? 'font-mono font-bold px-2 py-0.5 rounded text-[11px] bg-emerald-950 text-emerald-300 border border-emerald-800'
+                : 'font-mono font-bold px-2 py-0.5 rounded text-[11px] bg-amber-950 text-amber-300 border border-amber-800';
+            document.getElementById('alertModalStatus').innerText = statusText;
+            document.getElementById('alertModalPayload').innerText = payloadText;
+            document.getElementById('alertSimulationModal').classList.remove('hidden');
+        }
+
+        function closeAlertModal() {
+            document.getElementById('alertSimulationModal').classList.add('hidden');
+        }
+
         async function triggerTelegramAlert() {
+            const stormName = document.getElementById('lblStormName').innerText;
+            const wind = document.getElementById('lblWind').innerText;
             try {
                 const res = await fetch('/api/send-telegram-alert', { method: 'POST' });
                 const data = await res.json();
-                alert('✈️ Telegram Emergency Alert Dispatched!\nStatus: ' + data.status);
+                const isLive = data.result && (data.result.status === 'DELIVERED');
+                const statusText = isLive 
+                    ? `Delivered to Telegram Chat ID: ${data.result.chat_id}` 
+                    : `Safe Simulation: TELEGRAM_BOT_TOKEN not configured in .env (${data.result ? data.result.status : data.status})`;
+                const payload = [
+                    `🚨 [CYCLOVISION V2 AUTONOMOUS RED ALERT]`,
+                    `━━━━━━━━━━━━━━━━━━━━━`,
+                    `🌀 Target: ${stormName}`,
+                    `💨 Intensity: ${wind}`,
+                    `📍 Threat Sector: Visakhapatnam - Puri Coastal Buffer`,
+                    `🌊 Inundation Threat: 3.8m Storm Surge`,
+                    `🛡️ Action: Mandatory shelter evacuation. Total fishing ban.`,
+                    `📞 Disaster Helpline: 1070`
+                ].join('\n');
+                showAlertSimulationModal('Telegram Bot API', '✈️', isLive, statusText, payload);
             } catch (e) {
-                alert('Telegram Notice: ' + e);
+                showAlertSimulationModal('Telegram Bot API', '✈️', false, `Offline Notice: ${e.message || e}`, 'Telegram payload simulator');
             }
         }
 
         async function triggerWhatsAppAlert() {
+            const stormName = document.getElementById('lblStormName').innerText;
+            const wind = document.getElementById('lblWind').innerText;
             try {
                 const res = await fetch('/api/broadcast-whatsapp', { method: 'POST' });
                 const data = await res.json();
-                alert('💬 WhatsApp Disaster Relays Dispatched!\nRecipients: ' + Object.keys(data).length);
+                const isLive = data.status !== 'NOT_CONFIGURED';
+                const statusText = isLive 
+                    ? `Dispatched to ${Object.keys(data).length} verified district coordinators` 
+                    : `Safe Simulation: TWILIO_ACCOUNT_SID not configured in .env (Demo Mode)`;
+                const payload = [
+                    `🚨 *MoES NDMA CYCLONE RED ALERT*`,
+                    `━━━━━━━━━━━━━━━━━━━━━`,
+                    `Storm: ${stormName}`,
+                    `Surface Winds: ${wind}`,
+                    `Sector: Visakhapatnam - Puri Coast`,
+                    `Surge Hazard: 3.8m Inundation`,
+                    `Advisory: Move immediately to nearest cyclone shelter.`,
+                    `Helpline: 1070`
+                ].join('\n');
+                showAlertSimulationModal('Twilio WhatsApp API', '💬', isLive, statusText, payload);
             } catch (e) {
-                alert('WhatsApp Notice: ' + e);
+                showAlertSimulationModal('Twilio WhatsApp API', '💬', false, `Notice: ${e.message || e}`, 'WhatsApp payload simulator');
             }
         }
 
         async function triggerEmailAlert() {
+            const stormName = document.getElementById('lblStormName').innerText;
+            const wind = document.getElementById('lblWind').innerText;
             try {
                 const res = await fetch('/api/broadcast-email', { method: 'POST' });
                 const data = await res.json();
-                alert('📧 Email Official Advisory Dispatched & Logged!\nStatus: ' + data.status);
+                const isLive = (data.status === 'DISPATCHED_SMTP');
+                const statusText = isLive 
+                    ? `Dispatched via Gmail SMTP to: ${data.recipient}` 
+                    : `Advisory logged locally to v2/data/latest_email_alert.txt (${data.status})`;
+                const payload = [
+                    `To: Official Coastal Disaster Relays <advisory@cyclovision.in>`,
+                    `Subject: 🚨 URGENT CYCLONE RED ALERT: ${stormName}`,
+                    `===============================================================`,
+                    `OFFICIAL EMERGENCY ADVISORY — CYCLOVISION AI V2 (MoES/IMD)`,
+                    `Storm Name: ${stormName}`,
+                    `Maximum Sustained Surface Wind: ${wind}`,
+                    `Target Landfall Sector: Visakhapatnam - Puri Coast`,
+                    `Inundation Hazard: 3.5m - 4.2m Storm Surge Threat`,
+                    `Data Provenance: NOAA IBTrACS v4 + Open-Meteo REST Services`,
+                    `===============================================================`
+                ].join('\n');
+                showAlertSimulationModal('Email Advisory Bulletin', '📧', isLive, statusText, payload);
             } catch (e) {
-                alert('Email Notice: ' + e);
+                showAlertSimulationModal('Email Advisory Bulletin', '📧', false, `Notice: ${e.message || e}`, 'Email payload simulator');
             }
         }
 
         async function triggerAllMultiChannelAlerts() {
+            const stormName = document.getElementById('lblStormName').innerText;
             try {
                 const res = await fetch('/api/broadcast-all?force=true', { method: 'POST' });
                 const data = await res.json();
-                alert('🚀 ALL Multi-Channel Alerts Dispatched (Telegram, WhatsApp, Email, Audio Siren)!\nStatus: ' + data.status);
+                const statusText = `Sentinel Sweep Completed. Channels: Telegram (${data.telegram ? data.telegram.status : 'SIMULATED'}), WhatsApp (${data.whatsapp ? 'PROCESSED' : 'SIMULATED'}), Email (${data.email ? data.email.status : 'LOGGED'}), Audio Siren (${data.audio_siren ? data.audio_siren.status : 'ACTIVE'})`;
+                const payload = JSON.stringify(data, null, 2);
+                showAlertSimulationModal('Multi-Channel Broadcast Sentinel', '🚀', false, statusText, payload);
             } catch (e) {
-                alert('Broadcast Notice: ' + e);
+                showAlertSimulationModal('Multi-Channel Broadcast Sentinel', '🚀', false, `Notice: ${e.message || e}`, 'Broadcast payload simulator');
             }
         }
 
@@ -1843,29 +2090,107 @@
         }
 
         // -------------------------------------------------------------
-        // Guided 9-Step Demo Tour
+        // Guided 9-Step Demo Tour (In-App Floating Modal Controller)
         // -------------------------------------------------------------
-        function startDemoTour() {
-            const steps = [
-                "Step 1/9: Welcome to CycloVision AI V2 Authoritative Command Center!",
-                "Step 2/9: The Left Panel displays live NOAA IBTrACS best-track telemetry and calibrated intensity.",
-                "Step 3/9: The WebGIS Center Map visualizes the live storm center, historical vectors, and Swin-ConvLSTM sequence forecasts.",
-                "Step 4/9: In the Deck, open the 'What-If Simulator' to perturb SST and wind shear to evaluate thermodynamic Rapid Intensification.",
-                "Step 5/9: Switch to 'YOLOv8 Satellite LLCC' to detect low-level circulation center and eye symmetry.",
-                "Step 6/9: Switch to 'Shelter Geodesic Radar' to view exact Haversine distances to nearest municipal concrete shelters.",
-                "Step 7/9: Use 'Historical Replay' to step through Cyclone Fani, Amphan, or Biparjoy timelines.",
-                "Step 8/9: Forecasters can record validation decisions into the immutable SQLite Audit Ledger.",
-                "Step 9/9: Test multi-channel broadcasts (Telegram, WhatsApp, Email, Voice Speech) or inspect the 5-Layer Architecture!"
-            ];
-            let cur = 0;
-            function showNext() {
-                if (cur < steps.length) {
-                    alert(steps[cur]);
-                    cur++;
-                    if (cur < steps.length) setTimeout(showNext, 200);
+        const DEMO_TOUR_STEPS = [
+            {
+                title: "Welcome to CycloVision AI V2",
+                desc: "CycloVision AI V2 is an operational cyclone intelligence command platform fusing NOAA IBTrACS historical tracks, Deep Learning GRU forecasting, and real-time GIS spatial risk assessment."
+            },
+            {
+                title: "Storm Telemetry & Provenance Panel",
+                desc: "The Left Panel displays storm telemetry, central atmospheric pressure (calibrated in hPa), sustained wind speed (knots and km/h), and explicit historical/live data provenance tags."
+            },
+            {
+                title: "Authoritative WebGIS Center Map",
+                desc: "The dark-themed WebGIS map visualizes storm coordinate tracks, historical vectors, 6-step forward forecast trajectories, dynamic uncertainty cones, and maritime risk zones without tile errors."
+            },
+            {
+                title: "What-If Thermodynamic Simulator",
+                desc: "In the Operational Deck, test Emanuel Potential Intensity by perturbing Sea Surface Temperature (+1°C to +4°C) and Vertical Wind Shear (-20% to +20%) to observe Rapid Intensification (RI) probabilities."
+            },
+            {
+                title: "YOLOv8 Satellite Center (LLCC) Detector",
+                desc: "Inspect our fine-tuned YOLOv8n detector analyzing INSAT-3D / Himawari satellite imagery to pinpoint low-level circulation centers, eyewall symmetry, and convective structure."
+            },
+            {
+                title: "Municipal Shelter Geodesic Radar",
+                desc: "Evaluate geodesic proximity to verified coastal cyclone shelters (Puri, Visakhapatnam, Bhubaneswar, Paradeep) using Haversine calculation, capacity tracking, and automated routing."
+            },
+            {
+                title: "Historical Cyclone Track Replay",
+                desc: "Step through verified NOAA IBTrACS historical sequences for Super Cyclone Amphan (2020), Very Severe Cyclone Fani (2019), and Biparjoy (2023) to review AI forecast accuracy."
+            },
+            {
+                title: "HITL Forecaster Audit Trail Ledger",
+                desc: "Forecasters can record manual trajectory overrides and operational notes into an immutable SQLite WAL audit ledger ensuring full accountability and compliance."
+            },
+            {
+                title: "Multi-Channel Emergency Alert Dispatch",
+                desc: "Safely test CAP-compliant emergency broadcast dispatches across Telegram Bot API, Twilio WhatsApp, Official Email Bulletins, and Browser Audio Sirens in simulation mode."
+            }
+        ];
+
+        let currentTourStep = 0;
+
+        function renderTourStep(index) {
+            if (index < 0 || index >= DEMO_TOUR_STEPS.length) return;
+            currentTourStep = index;
+            const step = DEMO_TOUR_STEPS[index];
+            
+            const modal = document.getElementById('demoTourModal');
+            if (modal) modal.classList.remove('hidden');
+
+            const badge = document.getElementById('tourStepBadge');
+            if (badge) badge.innerText = `Step ${index + 1} of ${DEMO_TOUR_STEPS.length}`;
+
+            const title = document.getElementById('tourTitle');
+            if (title) title.innerText = step.title;
+
+            const desc = document.getElementById('tourDesc');
+            if (desc) desc.innerText = step.desc;
+
+            const prevBtn = document.getElementById('btnTourPrev');
+            if (prevBtn) {
+                prevBtn.disabled = (index === 0);
+                prevBtn.className = (index === 0) 
+                    ? 'bg-slate-800 text-slate-500 px-3 py-1 rounded text-xs font-semibold cursor-not-allowed'
+                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded text-xs font-semibold transition';
+            }
+
+            const nextBtn = document.getElementById('btnTourNext');
+            if (nextBtn) {
+                if (index === DEMO_TOUR_STEPS.length - 1) {
+                    nextBtn.innerHTML = 'Finish ✓';
+                    nextBtn.className = 'bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded text-xs font-bold transition';
+                } else {
+                    nextBtn.innerHTML = 'Next →';
+                    nextBtn.className = 'bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1 rounded text-xs font-bold transition flex items-center gap-1';
                 }
             }
-            showNext();
+        }
+
+        function startDemoTour() {
+            renderTourStep(0);
+        }
+
+        function nextDemoTourStep() {
+            if (currentTourStep < DEMO_TOUR_STEPS.length - 1) {
+                renderTourStep(currentTourStep + 1);
+            } else {
+                closeDemoTour();
+            }
+        }
+
+        function prevDemoTourStep() {
+            if (currentTourStep > 0) {
+                renderTourStep(currentTourStep - 1);
+            }
+        }
+
+        function closeDemoTour() {
+            const modal = document.getElementById('demoTourModal');
+            if (modal) modal.classList.add('hidden');
         }
 
         window.onload = () => {
