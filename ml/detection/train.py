@@ -28,8 +28,12 @@ def verify_dataset(data_yaml_path: str):
     if not names:
         raise ValueError("No classes defined in data.yaml!")
     for split in ['train', 'val']:
-        img_dir = os.path.join(ds_root, split, 'images')
-        lbl_dir = os.path.join(ds_root, split, 'labels')
+        img_dir = os.path.join(ds_root, 'images', split)
+        if not os.path.exists(img_dir):
+            img_dir = os.path.join(ds_root, split, 'images')
+        lbl_dir = os.path.join(ds_root, 'labels', split)
+        if not os.path.exists(lbl_dir):
+            lbl_dir = os.path.join(ds_root, split, 'labels')
         if not os.path.exists(img_dir) or not os.path.exists(lbl_dir):
             raise FileNotFoundError(f"Missing {split} image/label directory!")
         img_files = os.listdir(img_dir)

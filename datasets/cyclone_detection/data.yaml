@@ -1,7 +1,7 @@
 path: E:\CycloVision\datasets\cyclone_detection
-train: train/images
-val: val/images
-test: test/images
+train: images/train
+val: images/val
+test: images/test
 names:
   0: cyclone_eye
   1: cyclone_body

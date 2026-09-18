@@ -5,4 +5,4 @@ Recall: 0.5000
 F1 Score: 0.6598
 mAP@0.50: 0.9309
 mAP@0.50:0.95: 0.8549
-Total Inference Latency: 23.97 ms/frame
+Total Inference Latency: 25.04 ms/frame
