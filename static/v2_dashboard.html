@@ -679,7 +679,7 @@
                 loadV2Storm();
                 loadAuditTrail();
                 runLocationRiskLive();
-                fetchOpenMeteoTelemetry();
+                fetchLiveWeather(19.8, 85.8);
                 loadStoredSatelliteImages();
             } catch (err) {
                 console.error("Map initialization error:", err);
@@ -1245,8 +1245,7 @@
             try {
                 const res = await fetch('/api/send-telegram-alert', { method: 'POST' });
                 const data = await res.json();
-                alert('✈️ Telegram Emergency Alert Dispatched!
-Status: ' + data.status);
+                alert('✈️ Telegram Emergency Alert Dispatched!\nStatus: ' + data.status);
             } catch (e) {
                 alert('Telegram Notice: ' + e);
             }
@@ -1256,8 +1255,7 @@ Status: ' + data.status);
             try {
                 const res = await fetch('/api/broadcast-whatsapp', { method: 'POST' });
                 const data = await res.json();
-                alert('💬 WhatsApp Disaster Relays Dispatched!
-Recipients: ' + Object.keys(data).length);
+                alert('💬 WhatsApp Disaster Relays Dispatched!\nRecipients: ' + Object.keys(data).length);
             } catch (e) {
                 alert('WhatsApp Notice: ' + e);
             }
@@ -1267,8 +1265,7 @@ Recipients: ' + Object.keys(data).length);
             try {
                 const res = await fetch('/api/broadcast-email', { method: 'POST' });
                 const data = await res.json();
-                alert('📧 Email Official Advisory Dispatched & Logged!
-Status: ' + data.status);
+                alert('📧 Email Official Advisory Dispatched & Logged!\nStatus: ' + data.status);
             } catch (e) {
                 alert('Email Notice: ' + e);
             }
@@ -1278,8 +1275,7 @@ Status: ' + data.status);
             try {
                 const res = await fetch('/api/broadcast-all?force=true', { method: 'POST' });
                 const data = await res.json();
-                alert('🚀 ALL Multi-Channel Alerts Dispatched (Telegram, WhatsApp, Email, Audio Siren)!
-Status: ' + data.status);
+                alert('🚀 ALL Multi-Channel Alerts Dispatched (Telegram, WhatsApp, Email, Audio Siren)!\nStatus: ' + data.status);
             } catch (e) {
                 alert('Broadcast Notice: ' + e);
             }
