@@ -867,8 +867,8 @@
                     <pre id="alertModalPayload" class="bg-slate-950 p-2.5 rounded border border-slate-800 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto"></pre>
                 </div>
             </div>
-            <div class="flex justify-end pt-2 border-t border-slate-800">
-                <button onclick="closeAlertModal()" class="bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition">Dismiss</button>
+            <div class="flex justify-end items-center gap-2 pt-2 border-t border-slate-800" id="alertModalActions">
+                <button onclick="closeAlertModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition">Dismiss</button>
             </div>
         </div>
     </div>
@@ -1864,7 +1864,7 @@
         // -------------------------------------------------------------
         // Multi-Channel Emergency Dispatchers & Simulation Modal
         // -------------------------------------------------------------
-        function showAlertSimulationModal(channelName, icon, isLive, statusText, payloadText) {
+        function showAlertSimulationModal(channelName, icon, isLive, statusText, payloadText, actionBtnHtml = '') {
             document.getElementById('alertModalIcon').innerText = icon;
             document.getElementById('alertModalTitle').innerText = `${channelName} Emergency Dispatch`;
             const badge = document.getElementById('alertModalBadge');
@@ -1874,6 +1874,13 @@
                 : 'font-mono font-bold px-2 py-0.5 rounded text-[11px] bg-amber-950 text-amber-300 border border-amber-800';
             document.getElementById('alertModalStatus').innerText = statusText;
             document.getElementById('alertModalPayload').innerText = payloadText;
+            
+            const actionsContainer = document.getElementById('alertModalActions');
+            actionsContainer.innerHTML = `
+                ${actionBtnHtml}
+                <button onclick="closeAlertModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition">Dismiss</button>
+            `;
+
             document.getElementById('alertSimulationModal').classList.remove('hidden');
         }
 
@@ -1901,7 +1908,8 @@
                     `🛡️ Action: Mandatory shelter evacuation. Total fishing ban.`,
                     `📞 Disaster Helpline: 1070`
                 ].join('\n');
-                showAlertSimulationModal('Telegram Bot API', '✈️', isLive, statusText, payload);
+                const tgBtn = `<a href="https://t.me/cyclovision_alert_bot" target="_blank" rel="noopener noreferrer" class="bg-[#229ED9] hover:bg-[#1e8bc0] text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition shadow"><span>✈️</span> <span>Open Telegram Bot</span></a>`;
+                showAlertSimulationModal('Telegram Bot API', '✈️', isLive, statusText, payload, tgBtn);
             } catch (e) {
                 showAlertSimulationModal('Telegram Bot API', '✈️', false, `Offline Notice: ${e.message || e}`, 'Telegram payload simulator');
             }
@@ -1910,54 +1918,63 @@
         async function triggerWhatsAppAlert() {
             const stormName = document.getElementById('lblStormName').innerText;
             const wind = document.getElementById('lblWind').innerText;
+            const payload = [
+                `🚨 *MoES NDMA CYCLONE RED ALERT*`,
+                `━━━━━━━━━━━━━━━━━━━━━`,
+                `Storm: ${stormName}`,
+                `Surface Winds: ${wind}`,
+                `Sector: Visakhapatnam - Puri Coast`,
+                `Surge Hazard: 3.8m Inundation`,
+                `Advisory: Move immediately to nearest cyclone shelter.`,
+                `Helpline: 1070`
+            ].join('\n');
+
+            const waDirectUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(payload)}`;
+            const waBtn = `<a href="${waDirectUrl}" target="_blank" rel="noopener noreferrer" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition shadow"><span>💬</span> <span>Open & Send in WhatsApp</span></a>`;
+
             try {
                 const res = await fetch('/api/broadcast-whatsapp', { method: 'POST' });
                 const data = await res.json();
                 const isLive = data.status !== 'NOT_CONFIGURED';
                 const statusText = isLive 
-                    ? `Dispatched to ${Object.keys(data).length} verified district coordinators` 
-                    : `Safe Simulation: TWILIO_ACCOUNT_SID not configured in .env (Demo Mode)`;
-                const payload = [
-                    `🚨 *MoES NDMA CYCLONE RED ALERT*`,
-                    `━━━━━━━━━━━━━━━━━━━━━`,
-                    `Storm: ${stormName}`,
-                    `Surface Winds: ${wind}`,
-                    `Sector: Visakhapatnam - Puri Coast`,
-                    `Surge Hazard: 3.8m Inundation`,
-                    `Advisory: Move immediately to nearest cyclone shelter.`,
-                    `Helpline: 1070`
-                ].join('\n');
-                showAlertSimulationModal('Twilio WhatsApp API', '💬', isLive, statusText, payload);
+                    ? `Dispatched via Twilio WhatsApp API to configured emergency coordinators` 
+                    : `Twilio API: Credentials not in .env (Use direct WhatsApp button below to send immediately!)`;
+                showAlertSimulationModal('WhatsApp Emergency Alert', '💬', isLive, statusText, payload, waBtn);
             } catch (e) {
-                showAlertSimulationModal('Twilio WhatsApp API', '💬', false, `Notice: ${e.message || e}`, 'WhatsApp payload simulator');
+                showAlertSimulationModal('WhatsApp Emergency Alert', '💬', false, `Notice: ${e.message || e}`, payload, waBtn);
             }
         }
 
         async function triggerEmailAlert() {
             const stormName = document.getElementById('lblStormName').innerText;
             const wind = document.getElementById('lblWind').innerText;
+            const subject = `🚨 URGENT CYCLONE RED ALERT: ${stormName}`;
+            const payload = [
+                `To: Official Coastal Disaster Relays <advisory@cyclovision.in>`,
+                `Subject: ${subject}`,
+                `===============================================================`,
+                `OFFICIAL EMERGENCY ADVISORY — CYCLOVISION AI V2 (MoES/IMD)`,
+                `Storm Name: ${stormName}`,
+                `Maximum Sustained Surface Wind: ${wind}`,
+                `Target Landfall Sector: Visakhapatnam - Puri Coast`,
+                `Inundation Hazard: 3.5m - 4.2m Storm Surge Threat`,
+                `Data Provenance: NOAA IBTrACS v4 + Open-Meteo REST Services`,
+                `===============================================================`
+            ].join('\n');
+
+            const mailDirectUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(payload)}`;
+            const mailBtn = `<a href="${mailDirectUrl}" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1 transition shadow"><span>📧</span> <span>Open in Mail App</span></a>`;
+
             try {
                 const res = await fetch('/api/broadcast-email', { method: 'POST' });
                 const data = await res.json();
                 const isLive = (data.status === 'DISPATCHED_SMTP');
                 const statusText = isLive 
                     ? `Dispatched via Gmail SMTP to: ${data.recipient}` 
-                    : `Advisory logged locally to v2/data/latest_email_alert.txt (${data.status})`;
-                const payload = [
-                    `To: Official Coastal Disaster Relays <advisory@cyclovision.in>`,
-                    `Subject: 🚨 URGENT CYCLONE RED ALERT: ${stormName}`,
-                    `===============================================================`,
-                    `OFFICIAL EMERGENCY ADVISORY — CYCLOVISION AI V2 (MoES/IMD)`,
-                    `Storm Name: ${stormName}`,
-                    `Maximum Sustained Surface Wind: ${wind}`,
-                    `Target Landfall Sector: Visakhapatnam - Puri Coast`,
-                    `Inundation Hazard: 3.5m - 4.2m Storm Surge Threat`,
-                    `Data Provenance: NOAA IBTrACS v4 + Open-Meteo REST Services`,
-                    `===============================================================`
-                ].join('\n');
-                showAlertSimulationModal('Email Advisory Bulletin', '📧', isLive, statusText, payload);
+                    : `SMTP: GMAIL_APP_PASSWORD not configured (Logged to v2/data/latest_email_alert.txt)`;
+                showAlertSimulationModal('Email Advisory Bulletin', '📧', isLive, statusText, payload, mailBtn);
             } catch (e) {
-                showAlertSimulationModal('Email Advisory Bulletin', '📧', false, `Notice: ${e.message || e}`, 'Email payload simulator');
+                showAlertSimulationModal('Email Advisory Bulletin', '📧', false, `Notice: ${e.message || e}`, payload, mailBtn);
             }
         }
 

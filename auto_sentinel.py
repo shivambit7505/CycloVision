@@ -1,3 +1,4 @@
+import env_loader
 import time
 import json
 import urllib.request
@@ -40,6 +41,11 @@ def save_persisted_chat_id(chat_id: str) -> bool:
         return False
 
 def get_persisted_chat_id():
+    # 0. Check environment variable
+    env_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if env_id and re.match(r'^-?\d{6,16}$', env_id):
+        return env_id
+
     # 1. Try reading from cache file
     if os.path.exists(CHAT_ID_FILE):
         try:
@@ -51,29 +57,32 @@ def get_persisted_chat_id():
             pass
 
     # 2. Try fetching from Telegram getUpdates and cache it
-    try:
-        url = f"https://api.telegram.org/bot{TOKEN}/getUpdates"
-        req = urllib.request.urlopen(url)
-        data = json.loads(req.read().decode("utf-8"))
-        if data.get("result"):
-            cid = str(data["result"][-1]["message"]["chat"]["id"])
-            os.makedirs(os.path.dirname(CHAT_ID_FILE), exist_ok=True)
-            with open(CHAT_ID_FILE, "w", encoding="utf-8") as f:
-                f.write(cid)
-            return cid
-    except Exception:
-        pass
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or TOKEN
+    if token:
+        try:
+            url = f"https://api.telegram.org/bot{token}/getUpdates"
+            req = urllib.request.urlopen(url)
+            data = json.loads(req.read().decode("utf-8"))
+            if data.get("result"):
+                cid = str(data["result"][-1]["message"]["chat"]["id"])
+                os.makedirs(os.path.dirname(CHAT_ID_FILE), exist_ok=True)
+                with open(CHAT_ID_FILE, "w", encoding="utf-8") as f:
+                    f.write(cid)
+                return cid
+        except Exception:
+            pass
     return None
 
 def dispatch_telegram_alert(storm_name="CYCLONE-X", wind_kmph=165.0, stage="Very Severe Cyclonic Storm (VSCS)", landfall_time="Within 18 Hours"):
-    if not TOKEN:
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip() or TOKEN
+    if not token or token.startswith("your_"):
         print("  [NOTICE] Telegram notice: TELEGRAM_BOT_TOKEN not configured in .env")
         return {"status": "NOT_CONFIGURED", "message": "Set TELEGRAM_BOT_TOKEN in .env"}
 
     chat_id = get_persisted_chat_id()
     if not chat_id:
         print("  [NOTICE] Telegram notice: No chat_id found yet. Please send /start or 'Hi' to your Telegram alert bot once!")
-        return {"status": "WAITING_FOR_USER_START"}
+        return {"status": "WAITING_FOR_USER_START", "message": "Send /start to your bot or set TELEGRAM_CHAT_ID in .env"}
 
     msg = (
         f"🚨 *[CYCLOVISION V2 AUTONOMOUS RED ALERT]*\n"
@@ -88,7 +97,7 @@ def dispatch_telegram_alert(storm_name="CYCLONE-X", wind_kmph=165.0, stage="Very
         f"🛡️ *Action Required:* Move immediately to designated cyclone shelters. Total deep-sea fishing ban.\n"
         f"📞 *Disaster Helpline:* 1070"
     )
-    send_url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    send_url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = json.dumps({"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}).encode("utf-8")
     try:
         req = urllib.request.Request(send_url, data=payload, headers={"Content-Type": "application/json"})
@@ -100,14 +109,16 @@ def dispatch_telegram_alert(storm_name="CYCLONE-X", wind_kmph=165.0, stage="Very
         return {"status": "FAILED", "error": str(e)}
 
 def dispatch_whatsapp_alerts(storm_name="CYCLONE-X", wind_kmph=165.0):
-    if not TWILIO_SID or not TWILIO_TOKEN or not WHATSAPP_NUMBERS:
+    sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip() or TWILIO_SID
+    token = os.getenv("TWILIO_AUTH_TOKEN", "").strip() or TWILIO_TOKEN
+    from_num = os.getenv("TWILIO_WHATSAPP_FROM", "+17372508034").strip()
+    raw_nums = os.getenv("WHATSAPP_ALERT_NUMBERS", "").strip()
+    numbers = [n.strip() for n in raw_nums.split(",") if n.strip()] or WHATSAPP_NUMBERS
+
+    if not sid or not token or not numbers or sid.startswith("your_"):
         print("  [NOTICE] Twilio notice: Twilio credentials or WHATSAPP_ALERT_NUMBERS not configured in .env")
         return {"status": "NOT_CONFIGURED", "message": "Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and WHATSAPP_ALERT_NUMBERS in .env"}
 
-    twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_SID}/Messages.json"
-    credentials = f"{TWILIO_SID}:{TWILIO_TOKEN}"
-    base64_auth = base64.b64encode(credentials.encode("ascii")).decode("ascii")
-    
     body_text = (
         f"🚨 *MoES NDMA CYCLONE RED ALERT*\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
@@ -117,13 +128,31 @@ def dispatch_whatsapp_alerts(storm_name="CYCLONE-X", wind_kmph=165.0):
         f"Advisory: Evacuate lowlands immediately to concrete shelters.\n"
         f"State Helpline: *1070*"
     )
-    
+
+    clean_from = from_num if from_num.startswith("whatsapp:") else f"whatsapp:{from_num}"
     results = {}
-    for num in WHATSAPP_NUMBERS:
+
+    for num in numbers:
+        clean_to = num if num.startswith("whatsapp:") else f"whatsapp:{num}"
         try:
+            # 1. Try official Twilio Python Client
+            try:
+                from twilio.rest import Client
+                client = Client(sid, token)
+                msg = client.messages.create(from_=clean_from, to=clean_to, body=body_text)
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [WHATSAPP] SUCCESS to {num}! (SID: {msg.sid[:12]}...)")
+                results[num] = {"status": "SENT", "sid": msg.sid}
+                continue
+            except ImportError:
+                pass
+
+            # 2. Fallback to standard library urllib
+            twilio_url = f"https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
+            credentials = f"{sid}:{token}"
+            base64_auth = base64.b64encode(credentials.encode("ascii")).decode("ascii")
             data = urllib.parse.urlencode({
-                "From": f"whatsapp:{TWILIO_FROM}",
-                "To": f"whatsapp:{num}",
+                "From": clean_from,
+                "To": clean_to,
                 "Body": body_text
             }).encode("utf-8")
             
@@ -132,9 +161,9 @@ def dispatch_whatsapp_alerts(storm_name="CYCLONE-X", wind_kmph=165.0):
             
             with urllib.request.urlopen(req) as resp:
                 res_data = json.loads(resp.read().decode("utf-8"))
-                sid = res_data.get("sid", "")[:12]
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] [WHATSAPP] SUCCESS to {num}! (SID: {sid}...)")
-                results[num] = {"status": "SENT", "sid": sid}
+                msg_sid = res_data.get("sid", "")[:12]
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [WHATSAPP] SUCCESS to {num}! (SID: {msg_sid}...)")
+                results[num] = {"status": "SENT", "sid": msg_sid}
         except urllib.error.HTTPError as he:
             err_msg = he.read().decode("utf-8")
             print(f"[{datetime.now().strftime('%H:%M:%S')}] [NOTICE] Twilio response for {num}: {err_msg[:75]}...")
@@ -145,7 +174,7 @@ def dispatch_whatsapp_alerts(storm_name="CYCLONE-X", wind_kmph=165.0):
     return results
 
 def dispatch_email_alert(storm_name="CYCLONE-X", wind_kmph=165.0, stage="Very Severe Cyclonic Storm (VSCS)", target_email=None):
-    target_email = target_email or DEFAULT_ALERT_EMAIL
+    target_email = target_email or os.getenv("ALERT_RECIPIENT_EMAIL", "").strip() or os.getenv("GMAIL_USER", "").strip() or "advisory@cyclovision.in"
     subject = f"🚨 URGENT CYCLONE RED ALERT: {storm_name} ({stage})"
     body = (
         f"CYCLOVISION AI V2 — NATIONAL DECISION SUPPORT PLATFORM\n"
